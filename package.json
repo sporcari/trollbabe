@@ -1,0 +1,9 @@
+{
+  "name": "trollbabe-online",
+  "private": true,
+  "scripts": {
+    "build": "python3 build.py",
+    "test": "python3 build.py && node test/run_all.js"
+  },
+  "devDependencies": { "jsdom": "^29.1.1" }
+}

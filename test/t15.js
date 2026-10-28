@@ -1,0 +1,24 @@
+const {makeStore,makeClient,sleep}=require('./harness');
+const assert=require('assert');
+(async()=>{
+  const store=makeStore();
+  const A=makeClient(store,'uGM',{noSample:true}),B=makeClient(store,'uTB',{noSample:true});
+  await sleep(120);const TA=A.__TB,TB=B.__TB;
+  TA.D.n_name='M';TA.D.n_role='gm';TA.D.n_other='human';await TA.ACT.newGame();await sleep(60);
+  TB.D.j_code=TA.G.code;TB.D.j_name='T';await TB.ACT.joinGame();await sleep(100);
+  const S=()=>sleep(120);
+  await TB.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);await S();
+  await TA.A.savePrep({stakes:'S',a:'A',b:'B',chars:'',where:'',who:'',notes:''});await S();
+  await TA.A.openScene('Scena',[],false);await S();
+  await TB.A.declare('tb',{type:'fighting',pace:1,goal:'g'});await S();await TA.A.paceAdj('keep');await S();
+  const gm=A.document.querySelector('#dock-body').textContent, tb=B.document.querySelector('#dock-body').textContent;
+  assert.ok(gm.indexOf('ciò che non dici adesso non potrai introdurlo dopo')>=0,'manca il promemoria al GM');
+  assert.ok(gm.indexOf('Gli avversari e ciò che può far male')>=0,'etichetta GM');
+  assert.ok(A.document.querySelector('#f-fr_text').placeholder.indexOf('cosa può far male')>=0,'segnaposto GM');
+  assert.ok(tb.indexOf('ciò che non dici adesso')<0&&tb.indexOf('La tua azione')>=0,'la trollbabe non deve vedere il promemoria del GM');
+  const t=TA.TASKS.fair_gm();
+  assert.ok(t.indexOf('tutto ciò che si oppone alla trollbabe e può farle del male')>=0&&t.indexOf('non potrai introdurlo dopo')>=0,'prompt fair_gm');
+  const html=require('fs').readFileSync(require('path').join(__dirname,'..','dist','trollbabe-artifact.html'),'utf8');
+  assert.ok(html.indexOf('né nei successi, né nelle ferite, né nell’incapacità')>=0&&html.indexOf('Usa solo minacce e mezzi già dichiarati')>=0,'regole nei prompt');
+  console.log('OK: Fair and clear — promemoria al GM umano, prompt IA, vincolo sulle narrazioni successive');process.exit(0);
+})().catch(e=>{console.error('FAIL',e.stack||e);process.exit(1);});
