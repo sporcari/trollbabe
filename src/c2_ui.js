@@ -287,15 +287,17 @@ function sideHTML(){
  return h;
 }
 function rulesHTML(){
- return '<div class="card slim rules"><h4>Tiri (d10)</h4><p><b>Fighting</b>: successo se il d10 è <i>sotto</i> il numero. <b>Magic</b>: <i>sopra</i>. <b>Social</b>: il numero o oltre, dal lato meno probabile (numero fino a 5: da 1 al numero; da 6: dal numero a 10).</p>'+
- '<h4>Conflict</h4><p>Riguarda i personaggi, non la difficoltà. Chi lo dichiara sceglie Action Type e Pace; il Goal lo dice sempre la giocatrice. L’altra parte può spostare il Pace di un livello. Poi Fair and clear: nessuno è vincolato finché tutti confermano.</p>'+
- '<h4>Pace</h4><p>Action by action: 3 Serie riuscite (o 3 fallite) su max 5. Clash by clash: 2 su max 3. Entire conflict: una Serie.</p>'+
- '<h4>Una Serie</h4><p>Tiro iniziale. Se fallisce: scomodata, la narra la giocatrice; se si ferma, il Goal fallisce. Altrimenti sceglie un roll-again (una voce non ancora spuntata) e tira di nuovo: fallire dà ferita, poi incapacitata (la narra il GM, ostile), poi un ultimo tiro che può solo attenuare l’incapacità; se fallisce resta la narrazione del GM oppure la giocatrice dichiara la morte.</p>'+
- '<h4>Chi narra</h4><p>Serie riuscita: il GM, con una sola immagine. Serie fallita: la giocatrice. Nessuna nuova informazione.</p>'+
- '<h4>Roll-again</h4><p>Oggetto portato, alleato improvviso, oggetto trovato, incantesimo ricordato, elemento del terreno, più le Relationship. Ognuno una sola volta per avventura.</p>'+
- '<h4>Ferita</h4><p>Resta finché non c’è una scena di cura. Da ferita ogni Serie parte già dal primo box: al massimo due roll-again.</p>'+
- '<h4>Relationship</h4><p>Si stringono dopo un conflitto con un personaggio presente, più un’interazione. Per i PNG con nome decide il GM. Usarle come roll-again le mette a rischio.</p>'+
- '<h4>Scale</h4><p>Limita ciò che la trollbabe riesce a compiere di persona. Sale di 1 tra un’avventura e l’altra, mai scende.</p></div>';
+ return '<div class="card slim rules"><h4>Numero</h4><p>Da 2 a 9: più basso, più magia; più alto, più combattimento. Tra un’avventura e l’altra puoi alzarlo o abbassarlo di 1.</p>'+
+ '<h4>Tiri (d10)</h4><p><b>Fighting</b>: successo se il d10 è <i>sotto</i> il numero. <b>Magic</b>: <i>sopra</i>. <b>Social</b>: il numero o oltre, dal lato meno probabile (numero fino a 5: da 1 al numero; da 6: dal numero a 10).</p>'+
+ '<h4>Conflict</h4><p>Riguarda i personaggi, non la difficoltà. Chi lo dichiara sceglie Action Type e Pace; il Goal lo dice sempre la giocatrice. L’altra parte può spostare il Pace di un livello. Anche un luogo o un oggetto, come il mare in cui ti tuffi, diventa un avversario se qualcuno chiama il conflitto.</p>'+
+ '<h4>Fair and clear</h4><p>A turno, trollbabe e GM dicono cosa stanno facendo i loro personaggi; ciascuno accetta o modifica la propria dichiarazione. Si parte quando entrambi accettano. Ciò che il GM non dice qui non entra nel conflitto.</p>'+
+ '<h4>Pace</h4><p>Action by action: 3 Serie riuscite (o 3 fallite) su max 5. Clash by clash: 2 su max 3. Entire conflict: una Serie. Ogni Serie è un passo verso il Goal: prima di ogni tiro dici cosa fai, e il tiro decide se ti riesce.</p>'+
+ '<h4>Una Serie</h4><p>Tiro iniziale. Se fallisce: scomodata, la narra la giocatrice; se si ferma, la Serie è persa. Altrimenti sceglie un roll-again (una voce non ancora spuntata), dice come l’aiuta e tira di nuovo: fallire dà ferita, poi incapacitata (la narra il GM, ostile), poi un ultimo tiro che può solo attenuare l’incapacità; se fallisce resta la narrazione del GM oppure la giocatrice dichiara la morte.</p>'+
+ '<h4>Chi narra</h4><p>Serie riuscita: il GM, con una sola immagine; se il conflitto non è finito, narra solo come ti avvicini al Goal. Serie fallita: la giocatrice. Nessuna nuova informazione: retroscena e poteri dei PNG sono del GM.</p>'+
+ '<h4>Roll-again</h4><p>Oggetto portato, alleato improvviso, oggetto trovato, incantesimo ricordato, elemento del terreno, più le Relationship. Ognuno una sola volta per avventura. Un PNG con nome come alleato improvviso richiede il consenso del GM.</p>'+
+ '<h4>Ferita</h4><p>Deve avere senso per il conflitto: ferite o sfinimento nel Fighting, contraccolpo mistico nella Magic, orgoglio ferito nel Social, o un colpo alle spalle per ritorsione. Resta finché non c’è una scena di cura. Da ferita ogni Serie parte già dal primo box: al massimo due roll-again.</p>'+
+ '<h4>Relationship</h4><p>Si stringono dopo un conflitto con un personaggio presente, più un’interazione. Per i PNG con nome decide il GM. Gli alleati aiutano solo se sono in scena; avversari e amanti sono sempre nei paraggi. Usarle come roll-again le mette a rischio.</p>'+
+ '<h4>Scale</h4><p>Limita ciò che la trollbabe riesce a compiere di persona: puoi puntare più in alto, ma riesci solo alla tua misura. La pietra contro il portone ti fa passare, il portone resta in piedi. «Non puoi salvare la città»: ciò che sta sopra il tuo Scale lo decide il GM. Sale di 1 tra un’avventura e l’altra, mai scende.</p></div>';
 }
 function chatHTML(){
  const find=id=>id&&LOG.find(x=>x._id===id);
@@ -362,6 +364,7 @@ function dockHTML(){
  }
  return h+oocHTML();
 }
+function goalHint(){return '<p class="hint">Ciò che vuoi ottenere, detto in generale. Evita il Goal troppo passivo («sopravvivo»), quello che riguarda solo te («resto calma»: meglio «resto calma, così tutti vedono che è un idiota») e quello troppo specifico (un piano in più passi).</p>';}
 function amendHTML(){
  const e=LOG.find(x=>x._id===ui.amending);
  if(!e){ui.amending=null;return '';}
@@ -390,12 +393,13 @@ function pTbCreate(){
  return '<div class="form"><h3>Crea la tua trollbabe</h3>'+
   '<div class="two">'+fld('pc_name','Nome',{max:30})+'<div class="fld"><label>Numero (2–9)</label>'+seg('pc_num',[2,3,4,5,6,7,8,9].map(x=>[x,String(x)]),5,'num','numPrev')+'</div></div>'+
   '<p class="hint" id="rngPrev">'+rngText(n)+'. Più basso = più magia, più alto = più combattimento.</p>'+
+  '<details class="tips"><summary>Esempi</summary><ul><li><b>Tha</b> (3): mani nude, magia umana, spaventosa; tunica e mantello, spilla a forma di teschio, bastone troll nodoso.</li><li><b>Retta</b> (7): armi da lancio, magia troll, divertente; due piccole asce, un sasso fortunato, la lettera di un capitano di mare.</li><li><b>Kreshk</b> (6): mani nude, magia troll, grintosa; capelli a soffione, occhiali, una piuma appesa all’orecchio.</li><li><b>Bniri</b> (4): armi in mano, magia umana, distaccata; vesti da ricca, spada lunga, un bastoncino troll da masticare al collo.</li></ul></details>'+
   '<div class="fld"><label>Impressione di combattimento</label>'+seg('pc_fight',Object.keys(IMP_FIGHT).map(k=>[k,IMP_FIGHT[k]]),'melee')+'</div>'+
   '<div class="fld"><label>Impressione di magia</label>'+seg('pc_magic',Object.keys(IMP_MAGIC).map(k=>[k,IMP_MAGIC[k]]),'troll')+'</div>'+
   '<div class="fld"><label>Impressione sociale</label>'+seg('pc_social',Object.keys(IMP_SOCIAL).map(k=>[k,IMP_SOCIAL[k]]),'fierce')+'</div>'+
-  '<div class="two">'+fld('pc_hair','Capelli',{ph:'folti, spettinati, neri…'})+fld('pc_horns','Corna',{ph:'a spirale, corte da capra…'})+'</div>'+
-  '<div class="two">'+fld('pc_hum','Oggetto umano',{ph:'un libro, un gioiello lavorato…'})+fld('pc_troll','Oggetto troll',{ph:'un sasso fortunato, una pelle di rune…'})+'</div>'+
-  '<div class="two">'+fld('pc_cloth','Abiti',{ph:'gilet allacciato, gonna…'})+fld('pc_kit','Arma o equipaggiamento',{ph:'due asce da lancio'})+'</div>'+
+  '<div class="two">'+fld('pc_hair','Capelli',{ph:'crespi a soffione, lisci e neri…'})+fld('pc_horns','Corna',{ph:'corte da capra, coniche e dritte…'})+'</div>'+
+  '<div class="two">'+fld('pc_hum','Oggetto umano',{ph:'la lettera di un capitano, un gioiello lavorato…'})+fld('pc_troll','Oggetto troll',{ph:'un sasso fortunato, un bastoncino da masticare…'})+'</div>'+
+  '<div class="two">'+fld('pc_cloth','Abiti',{ph:'gilet allacciato, calzoni larghi, scalza…'})+fld('pc_kit','Arma o equipaggiamento',{ph:'due piccole asce da lancio'})+'</div>'+
   '<div class="fld"><label>Dove sta andando? (a piedi)</label>'+seg('pc_loc',LOCS.map(l=>[l.id,esc(l.name),l.hint]),null,'locs')+'</div>'+
   btn('Parti','createPC','primary')+'</div>';
 }
@@ -404,11 +408,11 @@ function pGmPrep(){
  return '<div class="form"><h3>Prepara l’avventura a '+esc(G.locName)+'</h3><p class="hint">Scale '+G.scale+': '+SCALES[G.scale-1]+'. Tutto resta segreto: solo tu lo vedi.</p>'+
   (sample?'<div class="gen"><h4>Hai bisogno di uno spunto?</h4>'+fld('gp_idea','Idea o tema (facoltativo)',{ph:'es. una faida tra pescatori, con un troll ferito'})+
    (ui.gen?'<div class="wait ai"><span class="spin"></span><span>L’IA sta preparando l’avventura…</span></div>':'<div class="row">'+btn('Genera con l’IA','genPrep')+'</div><p class="hint">Compila i campi qui sotto: leggi e cambia ciò che vuoi prima di salvare. Sovrascrive quello che hai già scritto.</p>')+'</div>':'')+
-  '<details class="tips"><summary>Promemoria</summary><ul><li><b>Dove.</b> Immagini concrete del luogo, dal punto di vista di una persona.</li><li><b>Chi.</b> Nessun luogo è vuoto: umani, troll o entrambi, e cosa stanno facendo. Il misto funziona meglio.</li><li><b>Stakes.</b> Una persona, un luogo o una cosa, della taglia del Scale attuale, che qualcuno vuole. Non è un obiettivo di trama e non riguarda la trollbabe.</li><li><b>Esiti.</b> Due esiti concreti e opposti (vive o muore, resta rotto o guarisce), senza come né perché.</li><li><b>Personaggi.</b> Pochi, con nome, desideri e legami (parentele, rivalità) che stringono attorno agli Stakes.</li></ul></details>'+
-  fld('gp_where','Dove',{rows:2,ph:'Come appare il luogo?'})+fld('gp_who','Chi c’è',{rows:2,ph:'Umani, troll, cosa fanno…'})+
-  fld('gp_stakes','Stakes',{ph:'Una persona, un luogo o una cosa'})+
-  '<div class="two">'+fld('gp_a','Esito A',{ph:'es. il ragazzo vive'})+fld('gp_b','Esito B',{ph:'es. il ragazzo muore'})+'</div>'+
-  fld('gp_chars','Personaggi (uno per riga: Nome — cosa vuole)',{rows:4})+fld('gp_notes','Note segrete',{rows:2})+
+  '<details class="tips"><summary>Promemoria</summary><ul><li><b>Dove.</b> Immagini concrete del luogo, dal punto di vista di una persona.</li><li><b>Chi.</b> Nessun luogo è vuoto: umani, troll o entrambi, e cosa stanno facendo. Il misto funziona meglio.</li><li><b>Stakes.</b> Una persona, un luogo o una cosa, della taglia del Scale attuale, che qualcuno vuole. Non è un obiettivo di trama e non riguarda la trollbabe.</li><li><b>Esiti.</b> Due esiti concreti e opposti (vive o muore, resta rotto o guarisce), senza come né perché.</li><li><b>Personaggi.</b> Pochi, con nome, desideri e legami (parentele, rivalità) che stringono attorno agli Stakes.</li><li><b>Non importa cosa scegli</b>, purché sia in crisi: se ti blocchi, prendi una persona qualsiasi del luogo.</li><li><b>Esempi per Scale.</b> Persona: un gatto bianco che è un mutaforma bambino, braccato dagli uomini del capo; un troll in gabbia in un serraglio, che il guardiano vuole morto. Gruppo organizzato: una nave di predoni tra zattere di adoratori drogati. Comunità: una città stretta tra due eserciti; una comunità troll colpita da una malattia.</li><li><b>Creature e magia.</b> Fenomeni locali che accentuano gli Stakes, non specie del mondo; dèi e demoni restano ambigui.</li><li><b>Nomi.</b> Tieni nelle note una lista di nomi umani e troll ancora liberi, da dare ai PNG quando servono.</li><li><b>Niente storia.</b> Nessun cattivo designato, nessun climax, nessuna missione.</li></ul></details>'+
+  fld('gp_where','Dove',{rows:2,ph:'es. monti bassi e tozzi, valli strette, nebbia tra i pini'})+fld('gp_who','Chi c’è',{rows:2,ph:'es. famiglie troll sparse nelle valli; un giovane guerriero umano venuto a uccidere un troll'})+
+  fld('gp_stakes','Stakes',{ph:'es. Ree-Shah, ragazza umana cresciuta dai troll, che lo sciamano vuole trasformare in troll'})+
+  '<div class="two">'+fld('gp_a','Esito A',{ph:'es. resta con la tribù'})+fld('gp_b','Esito B',{ph:'es. torna tra gli umani'})+'</div>'+
+  fld('gp_chars','Personaggi (uno per riga: Nome — cosa vuole)',{rows:4,ph:'Gallg — vecchio sciamano malato, vuole una troll che lo sostituisca\nOskel — guerriero giovane e spavaldo, vuole il suo primo troll'})+fld('gp_notes','Note segrete',{rows:2})+
   btn('Salva e apri la prima scena','savePrep','primary')+'</div>';
 }
 function pSceneOpen(){
@@ -456,7 +460,7 @@ function pDeclare(){
   '<div class="fld"><label>Action Type</label>'+seg('cf_type',Object.keys(TYPES).map(k=>[k,TYPES[k].label,TYPES[k].rule]),'fighting','types')+'</div>'+
   '<p class="hint" id="typeDesc">'+esc(TYPES[D.cf_type||'fighting'].desc)+'</p>'+
   '<div class="fld"><label>Pace</label>'+seg('cf_pace',[[3,'Action by action','3 Serie su max 5'],[2,'Clash by clash','2 su max 3'],[1,'Entire conflict','un solo tiro']],2,'','paceDesc')+'</div>'+
-  (me==='tb'?fld('cf_goal','Il tuo Goal',{ph:'Un risultato attivo che coinvolge qualcun altro: «lo calmo», «gli porto via l’ascia»…'})+'<p class="hint">Non un modo di difendersi, non un gesto: ciò che vuoi ottenere, detto in generale.</p>':'<p class="hint">Il Goal lo dirà la giocatrice.</p>')+
+  (me==='tb'?fld('cf_goal','Il tuo Goal',{ph:'«mi metto in salvo sulla terraferma», «lo metto al tappeto», «lo calmo»…'})+goalHint():'<p class="hint">Il Goal lo dirà la giocatrice.</p>')+
   '<div class="row">'+btn('Dichiara','cfGo','danger')+btn('Annulla','cfCancel','ghost')+'</div></div>';
 }
 function pSceneRequest(){
@@ -473,7 +477,7 @@ function pConflict(){
  const paceSeg=(n)=>{const p=c.pace;const o=[['keep','Resta '+PACES[p].it]];if(p<3)o.push(['up','Più fine: '+PACES[p+1].it]);if(p>1)o.push(['down','Più rapido: '+PACES[p-1].it]);return seg(n,o,'keep');};
  if(c.stage!=='fair'&&!exp.includes(me))return head+waitHTML(exp);
  switch(c.stage){
-  case 'goal':return head+'<div class="form"><h3>Qual è il tuo Goal?</h3><p class="hint">'+esc(TYPES[c.type].desc)+'</p>'+fld('cg_goal','Il tuo Goal',{rows:2,ph:'Risultato attivo che coinvolge qualcun altro, detto in generale'})+'<div class="fld"><label>Pace proposto dal GM</label>'+paceSeg('cg_adj')+'</div>'+btn('Conferma','setGoal','primary')+'</div>';
+  case 'goal':return head+'<div class="form"><h3>Qual è il tuo Goal?</h3><p class="hint">'+esc(TYPES[c.type].desc)+'</p>'+fld('cg_goal','Il tuo Goal',{rows:2,ph:'«mi metto in salvo sulla terraferma», «lo metto al tappeto», «lo calmo»…'})+goalHint()+'<div class="fld"><label>Pace proposto dal GM</label>'+paceSeg('cg_adj')+'</div>'+btn('Conferma','setGoal','primary')+'</div>';
   case 'pace':return head+'<div class="form"><h3>Pace</h3><p class="hint">Puoi lasciarlo com’è o spostarlo di un livello.</p>'+paceSeg('cp_adj')+btn('Conferma','paceAdj','primary')+'</div>';
   case 'fair':{
    const othSeat=me==='gm'?'tb':'gm',mine=c.fair[me],oth=c.fair[othSeat],myTurn=c.fair.turn===me;
@@ -481,7 +485,7 @@ function pConflict(){
    return head+'<div class="form"><h3>Fair and clear</h3><p class="hint">A turno: ciascuno dice cosa sta facendo il proprio personaggio all’inizio del conflitto; l’altro accetta o modifica la propria dichiarazione. Si parte quando entrambi accettano. '+(me==='gm'?'<b>Come GM, di’ qui apertamente cosa si oppone alla trollbabe e cosa può farle del male</b> (avversari, ambiente, magia, anche ciò che finora era nascosto): ciò che non dici adesso non potrai introdurlo dopo.':'')+'</p>'+
     box(othSeat,oth,c.fair[othSeat+'Ok'])+
     (!myTurn?box(me,mine,c.fair[me+'Ok'])+'<p class="hint">Tocca a '+esc(whoLabel(othSeat))+': legge la tua dichiarazione e accetta o modifica la propria.</p></div>':
-     fld('fr_text',me==='gm'?'Gli avversari e ciò che può far male':'La tua azione ('+esc(whoLabel(me))+')',{rows:3,def:mine,ph:me==='gm'?'Cosa fanno gli avversari, cosa si oppone, cosa può far male…':''})+
+     fld('fr_text',me==='gm'?'Gli avversari e ciò che può far male':'La tua azione ('+esc(whoLabel(me))+')',{rows:3,def:mine,ph:me==='gm'?'Cosa fanno gli avversari, cosa si oppone, cosa può far male…':(c.type==='magic'?'Magia troll (natura, spiriti: urla, danze, pitture) o umana (formule, testi, rituali calmi)?':'')})+
      '<div class="row">'+(!mine?btn('Dichiara','fairSay','primary'):(oth?btn('Accetto così','fairOk','primary'):'')+btn('Modifico e passo la mano','fairSay'))+'</div></div>');}
   case 'step':{
    if(me==='gm')return head+'<div class="form"><h3>Serie '+c.series+': la mossa degli avversari</h3><p class="hint">Cosa fanno ora gli avversari, con ciò che hai dichiarato nel Fair and clear. Niente esiti: li decide il dado.</p>'+fld('st_text','La mossa',{rows:2})+'<div class="row">'+btn('Narra la mossa','stepSay','primary')+btn('Nessuna mossa','stepNone')+'</div></div>';
@@ -506,7 +510,7 @@ function pConflict(){
     (items.length?fld('dc_text','Descrivi il roll-again',{rows:2})+'<div class="fld"><label>Roll-again</label>'+itemSeg('dc_item',items)+'</div>'+btn('Ultimo tiro','decideItem','primary'):'<p class="hint">Non hai più roll-again disponibili.</p>')+'</div>';
    return head+rollNote(c)+'<div class="form"><h3>Il terzo roll-again è fallito</h3><p class="hint">La narrazione del GM resta, oppure dichiari la morte della trollbabe e la descrivi tu.</p><div class="row">'+btn('Resta la narrazione del GM','decideAccept')+'</div>'+fld('dc_text','Come muore',{rows:2})+btn('Dichiaro la sua morte','decideDie','danger')+'</div>';}
   case 'rels':{
-   return head+'<div class="form"><h3>Il prezzo delle Relationship</h3><p class="hint">Chi hai usato come roll-again paga in base a come è finito il conflitto (tabella del manuale, a p. 49). Puoi correggere.</p>'+
+   return head+'<div class="form"><h3>Il prezzo delle Relationship</h3><p class="hint">Chi hai usato come roll-again paga in base a come è finito il conflitto (tabella del manuale 2023, a p. 48). Puoi correggere.</p>'+
     c.relCosts.map(x=>{const r=g.rels.find(y=>y.id===x.id);return r?'<div class="fld"><label>'+esc(r.name)+'</label>'+seg('rc_'+x.id,[['ok','Illeso'],['injured','Ferito'],['killed','Ucciso']],x.status)+'</div>':'';}).join('')+btn('Conferma','confirmRels','primary')+'</div>';}
  }
  return head;
@@ -515,7 +519,7 @@ function rollNote(c){return c.roll?'<div class="rn '+(c.roll.ok?'win':'lose')+'"
 function itemSeg(name,items){return seg(name,items.map(i=>[i.id,esc(i.label)]),items[0].id,'items');}
 function pRelOffer(){
  const g=G;
- return '<div class="form"><h3>Una Relationship?</h3><p class="hint">Dopo il conflitto puoi legarti a un personaggio presente (alleato, avversario, amante). Serve una breve interazione. Per i PNG con nome decide il GM.</p>'+
+ return '<div class="form"><h3>Una Relationship?</h3><p class="hint">Dopo il conflitto puoi legarti a un personaggio presente: alleato (spalla, compagno d’armi, seguace, mentore), avversario (nemico, rivale) o amante, che può essere l’uno e l’altro. Serve una breve interazione. Per i PNG con nome decide il GM.</p>'+
   '<datalist id="npcl">'+g.npcs.map(n=>'<option value="'+esc(n.name)+'">').join('')+'</datalist>'+
   fld('ro_name','Chi',{list:'npcl',ph:'«uno dei guerrieri» o un PNG con nome'})+
   '<div class="fld"><label>Tipo</label>'+seg('ro_type',Object.keys(REL_TYPES).map(k=>[k,REL_TYPES[k]]),'ally')+'</div>'+
@@ -524,7 +528,7 @@ function pRelOffer(){
 }
 function pRelApprove(){
  const p=G.relProposal||{name:'?',type:'ally'};
- return '<div class="form"><h3>Relationship con un personaggio con nome</h3><p>'+esc(pcName(G))+' propone: <b>'+esc(p.name)+'</b> come <b>'+REL_TYPES[p.type].toLowerCase()+'</b>.</p><p class="hint">Di solito si dice di no finché la situazione di partenza non è cambiata.</p><div class="row">'+btn('Accetta','relApprove','primary')+btn('Veto','relVeto')+'</div></div>';
+ return '<div class="form"><h3>Relationship con un personaggio con nome</h3><p>'+esc(pcName(G))+' propone: <b>'+esc(p.name)+'</b> come <b>'+REL_TYPES[p.type].toLowerCase()+'</b>.</p><p class="hint">Di solito si dice di no finché la situazione di partenza non è cambiata: un PNG con nome concesso troppo presto, prima di averlo visto decidere qualcosa, diventa difficile da giocare.</p><div class="row">'+btn('Accetta','relApprove','primary')+btn('Veto','relVeto')+'</div></div>';
 }
 function pEnding(){
  const g=G;
