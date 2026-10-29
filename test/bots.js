@@ -11,7 +11,7 @@ async function tbBot(w,b){
   switch(G.step){
     case 'tb_create':
       need('createPC');
-      Object.assign(D,{pc_name:b.name||'Retta',pc_num:String(b.num||6),pc_magic:'troll',pc_fight:'melee',pc_social:'fun',pc_hair:'bruni',pc_horns:'a spirale',pc_hum:'una lettera',pc_troll:'un sasso',pc_cloth:'gilet',pc_kit:'due asce',pc_loc:'4'});
+      Object.assign(D,{pc_name:b.name||'Retta',pc_num:String(b.num||6),pc_magic:'troll',pc_fight:'melee',pc_social:'fun',pc_hair:'bruni',pc_horns:'a spirale',pc_hum:'una lettera',pc_troll:'un sasso',pc_cloth:'gilet',pc_kit:'due asce'});
       await ACT.createPC();b.created=(b.created||0)+1;return true;
     case 'scene_play':{
       if(G.pc.status==='incap')return false;
@@ -62,8 +62,11 @@ async function tbBot(w,b){
     case 'rel_offer':
       if(b.relName&&!b.relDone){need('relPropose');D.ro_name=b.relName;D.ro_type='ally';D.ro_text='Gli tende la mano.';await ACT.relPropose();b.relDone=true;return true;}
       need('relSkip');await ACT.relSkip();return true;
+    case 'travel':{
+      need('travel');const opts=[...doc.querySelectorAll('#dock [data-seg="tv_place"] button')];if(!opts.length)throw new Error('nessun luogo nella mappa');
+      await ACT.tvPlace(opts[Math.min(2+(b.trips||0),opts.length-1)]);await ACT.travel();b.trips=(b.trips||0)+1;return true;}
     case 'interim':
-      need('interim');D.im_delta='1';D.im_loc='8';D.im_scale='yes';await ACT.interim();return true;
+      need('interim');D.im_delta='1';D.im_scale='yes';await ACT.interim();return true;
   }
   return false;
 }

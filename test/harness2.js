@@ -28,6 +28,7 @@ function makeStandalone(registry,o){
   const html=fs.readFileSync(require('path').join(__dirname,'..','index.html'),'utf8');
   const fetches=[];
   const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://sporcari.github.io/trollbabe/',beforeParse(w){
+    w.HTMLCanvasElement.prototype.getContext=()=>null;// jsdom non disegna: la mappa si prova a parte
     w.__TB_TEST__=true;
     w.Peer=makePeerClass(registry,o.peer);
     if(o.ls)Object.keys(o.ls).forEach(k=>w.localStorage.setItem(k,o.ls[k]));

@@ -32,7 +32,9 @@ const fresh=seq=>{if(!G||ver()!==seq)throw 'STALE';};
 
 function stateText(role,noSecret){
  const g=G,pc=g.pc,L=[];
- L.push('Scale '+g.scale+' ('+SCALES[g.scale-1]+'). Avventura n. '+g.adv+(g.locName?', luogo: '+g.locName:'')+', scena n. '+g.scene+'.');
+ L.push('Scale '+g.scale+' ('+SCALES[g.scale-1]+'). Avventura n. '+g.adv+(g.locName?', luogo: '+g.locName+(g.locHint?' ('+g.locHint+')':''):'')+', scena n. '+g.scene+'.');
+ const near=g.map?mapNear(g,5):[];
+ if(near.length)L.push('Luoghi vicini sulla mappa: '+near.map(p=>p.name+' ('+p.hint+(p.visited?', già visitato':'')+')').join('; ')+'.');
  if(pc){
   const r=ranges(pc.number);
   L.push('Trollbabe: '+pc.name+', numero '+pc.number+' (Fighting '+rangeText(r.fighting)+', Magic '+rangeText(r.magic)+', Social '+rangeText(r.social)+'). Impressioni: '+IMP_FIGHT[pc.fight]+', '+IMP_MAGIC[pc.magic]+', '+IMP_SOCIAL[pc.social]+'. Capelli: '+pc.hair+'. Corna: '+pc.horns+'. Abiti: '+pc.cloth+'. Equipaggiamento: '+pc.kit+'. Oggetto umano: '+pc.hum+'. Oggetto troll: '+pc.troll+'. Stato: '+STATUS[pc.status]+(pc.hurt?' ('+pc.hurt+')':'')+'.');
@@ -72,8 +74,8 @@ function chatText(){
 }
 const askHelp=()=>(G.ask&&G.ask.at===G.logN)?' Hai già chiesto un chiarimento su questa mossa e la risposta è nei CHIARIMENTI: ora rispondi tu, con l’interpretazione più ragionevole; "ask" resta null.':' Se la mossa della giocatrice è davvero ambigua (non è chiaro a chi parla, se tenta un’azione o dichiara solo un’intenzione, se è una domanda a te come GM e non ai PNG, oppure contraddice la fiction stabilita), invece di rispondere puoi farle UNA domanda breve fuori gioco in "ask", lasciando "text" vuoto. Non usarla per dettagli che puoi decidere tu.';
 const TASKS={
- pc_create:()=>'Crea la tua trollbabe. "number" va da 2 a 9: più basso = più brava in magia, più alto = più brava a combattere. Per fight/magic/social usa solo i valori ammessi. "loc" è il numero del luogo verso cui sta camminando: '+LOCS.map(l=>l.id+' '+l.name).join(', ')+'. Per capelli, corna, abiti, equipaggiamento e due oggetti (uno umano, uno troll: personali, non preziosi) scrivi descrizioni brevi e vivide.',
- gm_prep:()=>'Prepara in segreto l’avventura per '+G.locName+' al Scale '+G.scale+' ('+SCALES[G.scale-1]+'). "where": immagini concrete del luogo. "who": chi c’è (umani, troll o entrambi) e cosa fa: nessun luogo è vuoto. "stakes": una persona, luogo o cosa della taglia del Scale che qualcuno vuole e che è in crisi: deve poter cambiare in modo drastico (vita o morte, distruzione o conservazione, diventare altro), non con un semplice cambio di proprietà (NON un obiettivo di trama, NON una missione, NON qualcosa che riguarda la trollbabe). "a" e "b": due esiti concreti e opposti degli Stakes, senza come né perché. Esempio: Stakes «Ree-Shah, ragazza umana cresciuta dai troll, che il vecchio sciamano malato Gallg vuole trasformare in troll, mentre il giovane Oskel è salito sui monti a cacciare il suo primo troll»; esiti «resta con la tribù» / «torna tra gli umani». In "notes" aggiungi anche una breve lista di nomi umani e troll ancora liberi. "characters": 3–5 personaggi con nome e ciò che vogliono, legati tra loro (parentele, rivalità, desideri) in modo da stringere attorno agli Stakes. Il misto umani/troll funziona meglio; ogni tanto un elemento strano che accentui la tensione emotiva degli Stakes. Nei campi di testo scrivi al massimo 60 parole ciascuno.',
+ pc_create:()=>'Crea la tua trollbabe. "number" va da 2 a 9: più basso = più brava in magia, più alto = più brava a combattere. Per fight/magic/social usa solo i valori ammessi. Per capelli, corna, abiti, equipaggiamento e due oggetti (uno umano, uno troll: personali, non preziosi) scrivi descrizioni brevi e vivide. Per il nome scegline uno nordico fra questi o simile: '+pickNames(10,rid(6),'fu').join(', ')+'.',
+ gm_prep:()=>'Prepara in segreto l’avventura per '+G.locName+(G.locHint?' ('+G.locHint+')':'')+' al Scale '+G.scale+' ('+SCALES[G.scale-1]+'). "where": immagini concrete del luogo. "who": chi c’è (umani, troll o entrambi) e cosa fa: nessun luogo è vuoto. "stakes": una persona, luogo o cosa della taglia del Scale che qualcuno vuole e che è in crisi: deve poter cambiare in modo drastico (vita o morte, distruzione o conservazione, diventare altro), non con un semplice cambio di proprietà (NON un obiettivo di trama, NON una missione, NON qualcosa che riguarda la trollbabe). "a" e "b": due esiti concreti e opposti degli Stakes, senza come né perché. Esempio: Stakes «Ree-Shah, ragazza umana cresciuta dai troll, che il vecchio sciamano malato Gallg vuole trasformare in troll, mentre il giovane Oskel è salito sui monti a cacciare il suo primo troll»; esiti «resta con la tribù» / «torna tra gli umani». In "notes" aggiungi anche una breve lista di nomi umani e troll ancora liberi. Per gli umani usa nomi nordici come questi: '+pickNames(12,rid(6)).join(', ')+'. "characters": 3–5 personaggi con nome e ciò che vogliono, legati tra loro (parentele, rivalità, desideri) in modo da stringere attorno agli Stakes. Il misto umani/troll funziona meglio; ogni tanto un elemento strano che accentui la tensione emotiva degli Stakes. Nei campi di testo scrivi al massimo 60 parole ciascuno.',
  scene_open:()=>(G.scene===0?'È la prima scena: la storia si apre con la trollbabe che cammina verso il luogo; mostra il luogo e al massimo una presenza, senza mettere già in scena la posta in gioco. ':'')+'Apri la scena: dì dove siamo, le circostanze immediate e chi c’è. Massimo 50 parole, al più un PNG che agisce o parla, e fermati dove la trollbabe può rispondere. Non aprire con un PNG che le affida un incarico: mostra la situazione e lascia che sia lei a muoversi. '+(G.scene>0?'Rispetta la richiesta di scena della giocatrice, tranne se qualcuno si sta già muovendo per cercarla: in quel caso inizia nel punto dell’interruzione. ':'')+'In "npcs" elenca i nomi dei PNG con nome che introduci. "heal": true solo se la richiesta era una scena di cura e la concedi (se il luogo la rende problematica, concedila comunque: potrai chiamare un conflitto).',
  gm_respond:()=>'È il tuo turno di GM. Una sola mossa, massimo 50 parole, che lasci alla giocatrice il tempo di rispondere (niente eventi a catena, un solo PNG che parla alla volta). Reagisci a ciò che la trollbabe ha appena fatto o detto: descrivi ciò che si vede e le azioni e parole dei PNG (di parte, espliciti su ciò che vogliono). Applica il test dei Conflitti: se a un personaggio non sta bene che l’azione di lei vada come dichiara, o un gesto mette sotto stress il suo rapporto con gli Stakes, o un PNG agisce contro di lei, chiama il conflitto: "conflict" con type e pace (altrimenti null). Se lo chiami, fermati PRIMA dell’esito: descrivi solo l’istante dell’azione e la reazione del PNG, mai il risultato (niente «cade morto», «la scure lo colpisce»). Se la scena è a una pausa naturale o i personaggi hanno cambiato luogo, "end_scene": true. Se gli Stakes hanno raggiunto una condizione finale, "end_adventure": true. Se la trollbabe è incapacitata, chiudi la scena. Se la giocatrice ha deciso di lasciare il luogo, decidi se qualcuno cerca di fermarla (conflict) oppure "end_adventure": true. In "npcs" i nomi dei nuovi PNG con nome.'+askHelp()+objHelp(' In scena vale anche: azioni e parole dei PNG le decidi tu, non la giocatrice.'),
  table_talk:()=>'Sei al tavolo, fuori dal gioco: la giocatrice ti parla da persona a persona (la sua domanda è nelle NOTE), non è la trollbabe che parla ai PNG. Rispondi come GM, in prima persona, senza narrare e senza far parlare i PNG. Chiarisci la fiction già stabilita (età, distanze, chi è presente, cosa si vede o si sente). Se ti fa notare un’incoerenza o un errore, riconoscilo e correggi la fiction in modo esplicito («Hai ragione: …»): la correzione vale da ora in poi. Puoi fissare piccoli dettagli coerenti come faresti al tavolo, ma non rivelare la preparazione segreta (Stakes, esiti, retroscena, segreti dei PNG): se la domanda tocca un segreto, dì che si può scoprire in gioco. Non fare mosse, non far avanzare la scena, non chiamare conflitti. Massimo 60 parole.'+tableTalkMore(),
@@ -90,7 +92,8 @@ const TASKS={
  decide_tb:()=>G.conflict.kind==='incap'?'Sei incapacitata (il GM ha narrato). Puoi accettare ("accept": true) oppure giocare l’ultimo roll-again ("accept": false, "item" = id esatto, "text" = come lo usi, max 40 parole) per attenuare la sorte.':'Il terzo roll-again è fallito: resta la narrazione del GM ("die": false) oppure dichiari la morte della trollbabe ("die": true) e la descrivi in "text" (max 40 parole). Scegli la morte solo se è ciò che il personaggio vuole davvero.',
  rel_offer:()=>'Il conflitto è finito. Puoi legarti a un personaggio che era presente (alleato "ally", avversario "opp", amante "lover"). "form": true solo se ha senso per la tua trollbabe. "name": un PNG con nome già in scena oppure un anonimo ("uno dei guerrieri"). "text": come interagisce con lei subito dopo (max 40 parole).',
  ending:()=>'L’avventura finisce ('+(G.endWhy||'')+'). Scegli quale esito degli Stakes avviene ("a" o "b") se non si è risolto in gioco, e scrivi l’epilogo: cosa succede al luogo su scala più grande (max 90 parole), senza nuove scene.',
- interim:()=>'Tra un’avventura e l’altra. "delta": -1, 0 o 1 per il tuo numero. "drop": id delle Relationship che sciogli (lista, anche vuota). "scaleUp": true per far salire il Scale di 1. "loc": numero del luogo dove vai ora: '+LOCS.map(l=>l.id+' '+l.name).join(', ')+'.'
+ interim:()=>'Tra un’avventura e l’altra. "delta": -1, 0 o 1 per il tuo numero. "drop": id delle Relationship che sciogli (lista, anche vuota). "scaleUp": true per far salire il Scale di 1.',
+ travel:()=>'Scegli dove va ora la tua trollbabe, a piedi, tra i luoghi della mappa elencati nelle note. Preferisci un luogo dove non è ancora stata. In "place" metti l’id del luogo.'
 };
 
 // turni successivi del Fair and clear: l’IA rilegge la dichiarazione dell’altro e accetta o aggiorna la propria
@@ -112,7 +115,7 @@ async function raiseObjection(why,of,seq){
  await A.ooc('gm',why,{chat:1,objection:1});
  await tx(g=>{g.review=null;g.objection={of:of,why:why};},seq);
 }
-const LIGHT=['review','goal','fair_gm','fair_tb','step_gm','step_tb','rel_offer','interim','tb_request','decide_tb'];
+const LIGHT=['review','goal','fair_gm','fair_tb','step_gm','step_tb','rel_offer','interim','travel','tb_request','decide_tb'];
 const tierFor=t=>(AI.tier==='default'&&LIGHT.indexOf(t)>=0)?'quick':AI.tier;
 async function callAI(role,task,schema,extra,own){
  const ch=role==='gm'?chatText():'';
@@ -170,9 +173,9 @@ async function fairJob(s,seq){
 }
 const J={
  pcCreate:{label:'L’IA crea la trollbabe…',async run(seq){
-  const r=await callAI('tb','pc_create','{"name":"…","number":5,"fight":"unarmed|melee|missile","magic":"troll|human","social":"scary|sexy|fun|insightful|feisty|perky|remote|fierce","hair":"…","horns":"…","hum":"…","troll":"…","cloth":"…","kit":"…","loc":4}');
+  const r=await callAI('tb','pc_create','{"name":"…","number":5,"fight":"unarmed|melee|missile","magic":"troll|human","social":"scary|sexy|fun|insightful|feisty|perky|remote|fierce","hair":"…","horns":"…","hum":"…","troll":"…","cloth":"…","kit":"…"}');
   fresh(seq);
-  await A.createPC({name:str(r.name,30)||'Skah',number:intIn(r.number,2,9,5),magic:pickK(r.magic,IMP_MAGIC,'troll'),fight:pickK(r.fight,IMP_FIGHT,'melee'),social:pickK(r.social,IMP_SOCIAL,'fierce'),hair:str(r.hair,60)||'—',horns:str(r.horns,60)||'—',hum:str(r.hum,80)||'—',troll:str(r.troll,80)||'—',cloth:str(r.cloth,80)||'—',kit:str(r.kit,80)||'—'},intIn(r.loc,1,11,1));
+  await A.createPC({name:str(r.name,30)||'Skah',number:intIn(r.number,2,9,5),magic:pickK(r.magic,IMP_MAGIC,'troll'),fight:pickK(r.fight,IMP_FIGHT,'melee'),social:pickK(r.social,IMP_SOCIAL,'fierce'),hair:str(r.hair,60)||'—',horns:str(r.horns,60)||'—',hum:str(r.hum,80)||'—',troll:str(r.troll,80)||'—',cloth:str(r.cloth,80)||'—',kit:str(r.kit,80)||'—'});
  }},
  gmPrep:{label:'L’IA prepara l’avventura (in segreto)…',async run(seq){
   const r=await callAI('gm','gm_prep',PREP_SCHEMA);
@@ -280,9 +283,15 @@ const J={
   await A.finishEnding(PRIV&&PRIV[o]?PRIV[o]:(o==='a'?'Esito A':'Esito B'),str(r.text,900),PRIV);
  }},
  interim:{label:'La trollbabe si rimette in cammino…',async run(seq){
-  const r=await callAI('tb','interim','{"delta":0,"drop":[],"scaleUp":false,"loc":4}','Relationship (id = nome): '+(G.rels.filter(x=>!x.dead).map(x=>x.id+' = '+x.name).join('; ')||'nessuna'));fresh(seq);
+  const r=await callAI('tb','interim','{"delta":0,"drop":[],"scaleUp":false}','Relationship (id = nome): '+(G.rels.filter(x=>!x.dead).map(x=>x.id+' = '+x.name).join('; ')||'nessuna'));fresh(seq);
   const rels={};(Array.isArray(r.drop)?r.drop:[]).forEach(id=>{rels[String(id)]='drop';});
-  await A.interim({delta:intIn(r.delta,-1,1,0),rels:rels,scaleUp:!!r.scaleUp,loc:intIn(r.loc,1,11,1)});
+  await A.interim({delta:intIn(r.delta,-1,1,0),rels:rels,scaleUp:!!r.scaleUp});
+ }},
+ travel:{label:'La trollbabe sceglie dove andare…',async run(seq){
+  const m=G.map||newMap(rid(6),Object.keys(WORLDS)[rnd(3)]),dests=m.places.filter(isDest);
+  const r=await callAI('tb','travel','{"place":"p3"}','Luoghi della mappa (id: nome, cosa è): '+dests.map(p=>p.id+': '+p.name+', '+p.hint+(p.visited?' (già visitato)':'')).join('; '));fresh(seq);
+  const p=dests.find(x=>x.id===String(r.place))||dests.find(x=>!x.visited)||dests[0];
+  await A.travel(G.map?null:m,p);
  }}
 };
 function nextAIJob(){
@@ -299,6 +308,7 @@ function nextAIJob(){
   case 'rel_approve':return aiSeat('gm')?J.relApprove:null;
   case 'ending':return aiSeat('gm')?J.ending:null;
   case 'interim':return aiSeat('tb')?J.interim:null;
+  case 'travel':return aiSeat('tb')?J.travel:null;
   case 'conflict':
    if(!c)return null;
    switch(c.stage){
@@ -365,6 +375,6 @@ async function boot(){
  UID=id||localId();
  showStart();
 }
-if(window.__TB_TEST__){window.__TB={A:A,ACT:ACT,D:D,get G(){return G;},get LOG(){return LOG;},get AI(){return AI;},get PRIV(){return PRIV;},get ROLE(){return ROLE;},ranges:ranges,rollOk:rollOk,relCost:relCost,lastSeries:lastSeries,namedIn:namedIn,stateText:stateText,render:render,expected:expected,availableItems:availableItems,nextAIJob:nextAIJob,aiTick:aiTick,askOpen:askOpen,ui:ui,openGame:openGame,showStart:showStart,TASKS:TASKS};}
+if(window.__TB_TEST__){window.__TB={A:A,ACT:ACT,D:D,get G(){return G;},get LOG(){return LOG;},get AI(){return AI;},get PRIV(){return PRIV;},get ROLE(){return ROLE;},ranges:ranges,rollOk:rollOk,relCost:relCost,lastSeries:lastSeries,namedIn:namedIn,stateText:stateText,render:render,expected:expected,availableItems:availableItems,nextAIJob:nextAIJob,aiTick:aiTick,askOpen:askOpen,ui:ui,openGame:openGame,showStart:showStart,TASKS:TASKS,newMap:newMap,placeAt:placeAt,go(){const m=G.map||newMap('test','fiordi');return A.travel(G.map?null:m,m.places.filter(isDest)[0]);}};}
 boot();
 })();

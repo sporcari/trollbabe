@@ -8,7 +8,7 @@ const assert=require('assert');
   await sleep(120);const T=w.__TB;
   T.D.n_name='M';T.D.n_role='gm';T.D.n_other='human';await T.ACT.newGame();await sleep(40);
   w2.__TB.D.j_code=T.G.code;w2.__TB.D.j_name='T';await w2.__TB.ACT.joinGame();await sleep(80);
-  await w2.__TB.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);await sleep(150);
+  await w2.__TB.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await w2.__TB.go();await sleep(150);
   assert.ok(w.document.querySelector('[data-act="genPrep"]'),'manca il pulsante Genera');
   T.D.gp_idea='una faida tra pescatori';
   await T.ACT.genPrep();

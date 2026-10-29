@@ -10,7 +10,7 @@ async function setup(num){
   T.D.n_name='M';T.D.n_role='gm';T.D.n_other='human';await T.ACT.newGame();await sleep(30);
   w2.__TB.D.j_code=T.G.code;w2.__TB.D.j_name='T';await w2.__TB.ACT.joinGame();await sleep(80);
   const pc={name:'Retta',number:num||6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'};
-  await T.A.createPC(pc,4);
+  await T.A.createPC(pc);await T.go();
   await T.A.savePrep({stakes:'S',a:'A',b:'B',chars:'',where:'',who:'',notes:''});
   await T.A.openScene('Scena',['Orm'],false);
   eq(T.G.step,'scene_play','setup');

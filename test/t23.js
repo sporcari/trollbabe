@@ -8,7 +8,7 @@ const eq=(a,b,m)=>assert.strictEqual(a,b,m+' (atteso '+b+', trovato '+a+')');
   await sleep(120);const T=w.__TB,T2=w2.__TB;
   T.D.n_name='M';T.D.n_role='gm';T.D.n_other='human';await T.ACT.newGame();await sleep(30);
   T2.D.j_code=T.G.code;T2.D.j_name='T';await T2.ACT.joinGame();await sleep(80);
-  await T.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);
+  await T.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await T.go();
   await T.A.savePrep({stakes:'S',a:'A',b:'B',chars:'',where:'',who:'',notes:''});
   await T.A.openScene('Il guado.',[],false);
   const win=async(name,type)=>{

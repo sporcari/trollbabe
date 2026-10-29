@@ -38,6 +38,7 @@ function makeClient(store,uid,opts){
   const calls=[];
   const win={};
   const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://trollbabe.test/',beforeParse(window){
+    window.HTMLCanvasElement.prototype.getContext=()=>null;// jsdom non disegna: la mappa si prova a parte
     window.__TB_TEST__=true;
     const db=makeDB(store,uid);
     const sample=async()=>{throw {code:'invalid_request'};};

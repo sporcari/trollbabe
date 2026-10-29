@@ -16,7 +16,7 @@ const rollWait=async T=>{const t=Date.now()+3000;while((T.G.review||T.G.objectio
   };
   const w=makeClient(makeStore(),'uA',{ai});await sleep(120);const T=w.__TB;const roll=async v=>{await rollWait(T);return T.A.roll(v);};
   T.D.n_name='S';T.D.n_role='tb';T.D.n_other='ai';await T.ACT.newGame();await sleep(60);
-  await T.A.createPC({name:'Kreshk',number:4,magic:'troll',fight:'unarmed',social:'feisty',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);
+  await T.A.createPC({name:'Kreshk',number:4,magic:'troll',fight:'unarmed',social:'feisty',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await T.go();
   await until(()=>T.G.step==='scene_play',3000,'scena aperta');
   const doc=w.document,C=()=>T.G.conflict;
   const stage=s=>until(()=>C()&&C().stage===s,3000,'stage '+s);

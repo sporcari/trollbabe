@@ -7,7 +7,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 rd=lambda f: open('src/'+f,encoding='utf-8').read()
 head=rd('head.html'); assert head.rstrip().endswith('<script>')
 head=head.rstrip()[:-len('<script>')]
-core=rd('c1_core.js')+rd('c2_ui.js')+rd('c3_ai.js')
+core=rd('c1_core.js')+rd('c1m_map.js')+rd('c2_ui.js')+rd('c3_ai.js')
 tail='\n</script>\n</body>\n</html>\n'
 artifact=head+'<script>\n'+core+tail
 standalone=(head+'<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>\n<script>\n'

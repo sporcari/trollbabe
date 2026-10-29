@@ -17,7 +17,7 @@ const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if
   };
   const w=makeClient(makeStore(),'uA',{ai});await sleep(120);const T=w.__TB;
   T.D.n_name='S';T.D.n_role='tb';T.D.n_other='ai';await T.ACT.newGame();await sleep(60);
-  await T.A.createPC({name:'Kreshk',number:4,magic:'troll',fight:'unarmed',social:'feisty',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);
+  await T.A.createPC({name:'Kreshk',number:4,magic:'troll',fight:'unarmed',social:'feisty',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await T.go();
   await until(()=>T.G.step==='scene_play',3000,'scena aperta');
   const doc=w.document,dock=()=>doc.querySelector('#dock-body').textContent,calls=t=>w.__calls.filter(c=>c.task===t);
   const fix=async(t)=>{doc.querySelector('#dock-body [data-act="amendOpen"]').click();await sleep(30);T.D.am_text=t;await T.ACT.amendSave();};

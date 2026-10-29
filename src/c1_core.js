@@ -14,19 +14,19 @@ const rnd=n=>{try{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[
 const d10=()=>rnd(10)+1;
 
 /* ================= dati di gioco ================= */
-const LOCS=[
- {id:1,name:'Lazy Bog',hint:'palude'},
- {id:2,name:'Kjallr’s Wood',hint:'foresta'},
- {id:3,name:'The Rotten Teeth',hint:'scogli in mare'},
- {id:4,name:'Gyfrshal',hint:'luogo fortificato'},
- {id:5,name:'The High Lake',hint:'lago tra i monti'},
- {id:6,name:'Mount Yawny',hint:'montagna'},
- {id:7,name:'Smouldering Shores',hint:'coste fumanti'},
- {id:8,name:'Madman’s Henge',hint:'pietre erette'},
- {id:9,name:'The Singing Stones',hint:'pietre'},
- {id:10,name:'The Ice Palace',hint:'ghiaccio'},
- {id:11,name:'Leviathan Isles',hint:'isole nel mare'}
-];
+// nomi vichinghi per la trollbabe e i PNG umani (elenco di terre-des-loups.fr)
+const NAMES={
+ f:['Astrid','Freya','Ingrid','Sigrid','Ragnhild','Thora','Helga','Gudrun','Solveig','Signe','Runa','Liv','Yrsa','Aslaug','Hilde','Brynhild','Toril','Frida','Estrid','Gunnhild','Sigrun','Idun','Ulfhild','Ragnhilda','Alva','Lagertha'],
+ m:['Ragnar','Bjorn','Ulf','Erik','Harald','Sven','Ivar','Sigurd','Leif','Rolf','Olaf','Gunnar','Halfdan','Torstein','Magnus','Frode','Odd','Eirik','Knut','Snorri','Torbjorn','Alrek','Hakon','Ingvar','Torvald','Ulfar','Ulfvid','Bjornolf','Ingolfr','Torolf','Hrolfr','Ulfrik','Ubbe'],
+ u:['Kari','Ari','Bo','Sten','Ove']
+};
+// kinds: lettere di NAMES; esclude i nomi già in gioco
+function pickNames(n,seed,kinds){
+ const used=new Set(((G&&G.npcs)||[]).map(x=>x.name).concat(G&&G.pc?[G.pc.name]:[]));
+ const all=(kinds||'fmu').split('').reduce((a,k)=>a.concat(NAMES[k]||[]),[]).filter(x=>!used.has(x)),R=mulberry(hashStr(String(seed))),out=[];
+ while(out.length<n&&out.length<all.length){const x=all[Math.floor(R()*all.length)];if(out.indexOf(x)<0)out.push(x);}
+ return out;
+}
 const SCALES=['Persona','Piccolo gruppo','Gruppo organizzato','Villaggio','Comunità sostanziosa','Provincia','Terra'];
 const TYPES={
  fighting:{label:'Fighting',rule:'successo se il d10 è sotto il tuo numero',desc:'Solo violenza: sottomettere, mettere fuori gioco, uccidere. Niente dialogo né sfumature.'},
@@ -145,7 +145,6 @@ async function commit(g,entries,prevSeq,base){
 }
 
 /* ================= azioni (motore) ================= */
-function setLoc(g,id){const l=LOCS.find(x=>x.id===id)||LOCS[0];g.loc=l.id;g.locName=l.name;}
 function resetAdv(g){g.scene=0;g.checked=[];g.npcs=[];g.conflict=null;g.leaving=false;g.request=null;g.reveal=null;g.lastConflict=null;g.relResult=null;(g.rels||[]).forEach(r=>{r.checked=false;});}
 function addNpcs(g,list){
   (list||[]).forEach(n=>{n=String(n||'').trim().slice(0,60);if(n&&!g.npcs.some(x=>x.name.toLowerCase()===n.toLowerCase()))g.npcs.push({name:n});});
@@ -208,10 +207,20 @@ function addRel(g,o){
 }
 
 const A={
- createPC(pc,loc){return tx((g,push)=>{
+ createPC(pc){return tx((g,push)=>{
   if(g.pc)g.adv=(g.adv||1)+1;
-  g.pc=Object.assign({},pc,{status:'ok'});g.rels=[];setLoc(g,loc);resetAdv(g);g.step='gm_prep';
-  push('sys','',pc.name+' (numero '+pc.number+') si mette in cammino verso '+g.locName+'.');
+  g.pc=Object.assign({},pc,{status:'ok'});g.rels=[];g.loc=null;g.locName='';g.locHint='';resetAdv(g);g.step='travel';
+  push('sys','',pc.name+' (numero '+pc.number+') è pronta a mettersi in cammino.');
+ });},
+ // la prima partenza fissa anche la mappa del mondo, che poi resta la stessa per tutta la partita
+ travel(map,place){return tx((g,push)=>{
+  if(g.step!=='travel'||!place)return false;
+  if(!g.map){if(!map)return false;g.map=map;}
+  let p=g.map.places.find(x=>x.id===place.id);
+  if(!p){if(!place.fresh)return false;p=Object.assign({},place);delete p.fresh;g.map.places.push(p);}
+  if(!isDest(p))return false;
+  p.visited=true;g.loc=p.id;g.locName=p.name;g.locHint=p.hint||'';g.step='gm_prep';
+  push('sys','',pcName(g)+' si mette in cammino verso '+p.name+(p.hint?', '+p.hint:'')+'.');
  });},
  savePrep(priv){return (async()=>{
   await secret.set(CODE,priv);PRIV=priv;
@@ -266,8 +275,7 @@ const A={
    else if(m==='swap'&&r.type!=='lover'){r.type=r.type==='ally'?'opp':'ally';push('sys','',r.name+' diventa '+REL_TYPES[r.type].toLowerCase()+'.');}
   });
   if(o.scaleUp&&g.scale<7){g.scale++;push('sys','','Il Scale sale a '+g.scale+': '+SCALES[g.scale-1]+'.');}
-  g.adv=(g.adv||1)+1;setLoc(g,o.loc);resetAdv(g);g.step='gm_prep';
-  push('sys','',pcName(g)+' si dirige verso '+g.locName+'.');
+  g.adv=(g.adv||1)+1;resetAdv(g);g.step='travel';
  });},
  /* conflitti */
  declare(seat,o){return tx((g,push)=>{
@@ -406,7 +414,7 @@ function expected(g){
  if(g.objection)return ['tb'];
  const c=g.conflict;
  switch(g.step){
-  case 'tb_create':case 'scene_request':case 'rel_offer':case 'interim':return ['tb'];
+  case 'tb_create':case 'travel':case 'scene_request':case 'rel_offer':case 'interim':return ['tb'];
   case 'gm_prep':case 'scene_open':case 'rel_approve':case 'ending':return ['gm'];
   case 'scene_play':return [g.turn||'tb'];
   case 'conflict':

@@ -18,7 +18,7 @@ const waitFor=async(c,ms,msg)=>{const t0=Date.now();while(Date.now()-t0<(ms||800
   const TH=H.__TB,TG=G.__TB;
   TH.D.n_name='Marta';TH.D.n_role='gm';TH.D.n_other='human';await TH.ACT.newGame();await sleep(100);
   const code=TH.G.code;TG.D.j_code=code;TG.D.j_name='Giulia';await TG.ACT.joinGame();await sleep(300);
-  await TG.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);await sleep(150);
+  await TG.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await TG.go();await sleep(150);
   await TH.A.savePrep({stakes:'S',a:'A',b:'B',chars:'',where:'',who:'',notes:''});await sleep(150);
   await TH.A.openScene('Scena',[],false);await sleep(200);
   eq(TG.G.step,'scene_play','guest in gioco');

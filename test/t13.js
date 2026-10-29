@@ -5,7 +5,7 @@ const assert=require('assert');
     gm_respond:()=>({text:'Eirik spalanca gli occhi mentre la scure lascia la tua mano.',conflict:{type:'fighting',pace:1},end_scene:false})};
   const w=makeClient(makeStore(),'uA',{ai});await sleep(120);const T=w.__TB;
   T.D.n_name='S';T.D.n_role='tb';T.D.n_other='ai';await T.ACT.newGame();await sleep(150);
-  Object.assign(T.D,{pc_name:'Gwenna',pc_num:'6',pc_magic:'troll',pc_fight:'missile',pc_social:'fun',pc_loc:'9'});await T.ACT.createPC();await sleep(1500);
+  Object.assign(T.D,{pc_name:'Gwenna',pc_num:'6',pc_magic:'troll',pc_fight:'missile',pc_social:'fun'});await T.ACT.createPC();await T.ACT.tvPlace({dataset:{val:'p3'}});await T.ACT.travel();await sleep(1500);
   T.D.sp_text='Lancio la scure e uccido Eirik.';await T.ACT.say();await sleep(1200);
   const p=w.__calls.find(c=>c.task==='gm_respond').prompt;
   assert.ok(p.indexOf('mi sta bene che vada come dice lei')>=0&&p.indexOf('CHIAMA IL CONFLITTO')>=0&&p.indexOf('fermati PRIMA dell’esito')>=0,'prompt senza il test dei conflitti');

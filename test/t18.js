@@ -14,7 +14,7 @@ const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if
   };
   const w=makeClient(makeStore(),'uA',{ai});await sleep(120);const T=w.__TB;
   T.D.n_name='S';T.D.n_role='tb';T.D.n_other='ai';await T.ACT.newGame();await sleep(60);
-  await T.A.createPC({name:'Mirna',number:4,magic:'troll',fight:'unarmed',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);
+  await T.A.createPC({name:'Mirna',number:4,magic:'troll',fight:'unarmed',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await T.go();
   await until(()=>T.G.step==='scene_play',3000,'scena aperta');
   const doc=w.document,F=()=>T.G.conflict.fair;
   const calls=()=>w.__calls.filter(c=>c.task==='fair_gm');

@@ -8,7 +8,7 @@ const rollWait=async T=>{const t=Date.now()+3000;while((T.G.review||T.G.objectio
   const ai={gm_prep:()=>({where:'w',who:'h',stakes:'S',a:'a',b:'b',characters:[],notes:''}),scene_open:()=>({text:'Scena.',npcs:[],heal:true}),gm_respond:()=>({text:'ok'}),fair_gm:()=>({text:'Il canto sale.'}),narr_gm:()=>({text:'ok'}),review:()=>({objection:null})};
   const w=makeClient(store,'uA',{ai});await sleep(120);const T=w.__TB;const roll=async v=>{await rollWait(T);return T.A.roll(v);};
   T.D.n_name='S';T.D.n_role='tb';T.D.n_other='ai';await T.ACT.newGame();await sleep(150);
-  Object.assign(T.D,{pc_name:'Gwenna',pc_num:'6',pc_magic:'troll',pc_fight:'missile',pc_social:'fun',pc_loc:'9'});await T.ACT.createPC();await sleep(1500);
+  Object.assign(T.D,{pc_name:'Gwenna',pc_num:'6',pc_magic:'troll',pc_fight:'missile',pc_social:'fun'});await T.ACT.createPC();await T.ACT.tvPlace({dataset:{val:'p3'}});await T.ACT.travel();await sleep(1500);
   // conflitto Magic: due fallimenti → ferita descritta
   await T.A.declare('tb',{type:'magic',pace:1,goal:'Capisco chi canta'});
   await waitFor(()=>T.G.conflict&&T.G.conflict.stage==='fair');

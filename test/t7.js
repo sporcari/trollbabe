@@ -7,7 +7,7 @@ const eq=(a,b,m)=>assert.strictEqual(a,b,m+' (atteso '+b+', trovato '+a+')');
   await sleep(120);const TA=A.__TB,TB=B.__TB;
   TA.D.n_name='M';TA.D.n_role='gm';TA.D.n_other='human';await TA.ACT.newGame();await sleep(40);
   TB.D.j_code=TA.G.code;TB.D.j_name='T';await TB.ACT.joinGame();await sleep(80);
-  await TB.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);await sleep(60);
+  await TB.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await TB.go();await sleep(60);
   await TA.A.savePrep({stakes:'S',a:'A',b:'B',chars:'',where:'',who:'',notes:''});await sleep(60);
   await TA.A.openScene('Scena',[],false);await sleep(80);
   eq(TB.G.step,'scene_play','B vede la scena');

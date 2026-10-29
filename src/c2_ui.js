@@ -164,7 +164,7 @@ function render(){
  if(G.step!=='scene_play')ui.declaring=false;
  if(!G.conflict||G.conflict.stage!=='fair')delete D.fr_text;
  renderTop();
- const fm=['tb_create','gm_prep','interim','lobby'].indexOf(G.step)>=0;
+ const fm=['tb_create','travel','gm_prep','interim','lobby'].indexOf(G.step)>=0;
  $('.col').classList.toggle('formmode',fm);
  const chatOn=chatAvail(),nChat=LOG.filter(isChat).length;
  document.body.classList.toggle('chaton',chatOn);
@@ -177,10 +177,16 @@ function render(){
  if(k!==lastKey){lastKey=k;redraw($('#dock-body'),dockHTML());}
 }
 // ridisegna conservando focus e cursore del campo che si sta scrivendo
+function drawMaps(el){
+ $$('canvas[data-map]',el).forEach(cv=>{
+  const pick=cv.dataset.map==='pick',m=pick?travelMap():G&&G.map;
+  if(m)drawMap(cv,m,{cur:G.loc,pick:pick?ui.mapPick:null});
+ });
+}
 function redraw(el,html){
  const ae=document.activeElement,nm=ae&&el.contains(ae)&&ae.dataset&&ae.dataset.d;let pos=null;
  if(nm&&ae.selectionStart!=null)pos=[ae.selectionStart,ae.selectionEnd];
- el.innerHTML=html;
+ el.innerHTML=html;drawMaps(el);
  const n=nm&&el.querySelector('[data-d="'+nm+'"]');
  if(n){n.focus();try{if(pos)n.setSelectionRange(pos[0],pos[1]);}catch(e){}}
 }
@@ -266,6 +272,7 @@ function sideHTML(){
  if(ui.tab==='more')return moreHTML();
  if(ui.tab==='chat')return chatHTML();
  let h='<div class="card slim"><div class="k">Scale</div><b>'+g.scale+' · '+SCALES[g.scale-1]+'</b></div>';
+ if(g.map)h+='<div class="card slim"><div class="k">Mappa</div><canvas class="mapcv" data-map="side" role="img" aria-label="Mappa del mondo"></canvas>'+(g.locName?'<p class="hint">'+esc(g.locName)+(g.locHint?' — '+esc(g.locHint):'')+'</p>':'')+'</div>';
  const pc=g.pc;
  if(pc){
   const r=ranges(pc.number);
@@ -361,6 +368,7 @@ function dockHTML(){
   case 'rel_approve':h=ROLE==='gm'?pRelApprove():waitHTML(['gm']);break;
   case 'ending':h=ROLE==='gm'?pEnding():waitHTML(['gm']);break;
   case 'interim':h=ROLE==='tb'?pInterim():waitHTML(['tb']);break;
+  case 'travel':h=ROLE==='tb'?pTravel():waitHTML(['tb']);break;
  }
  return h+oocHTML();
 }
@@ -391,7 +399,7 @@ function pLobby(){
 function pTbCreate(){
  const n=parseInt(D.pc_num,10)||5;
  return '<div class="form"><h3>Crea la tua trollbabe</h3>'+
-  '<div class="two">'+fld('pc_name','Nome',{max:30})+'<div class="fld"><label>Numero (2–9)</label>'+seg('pc_num',[2,3,4,5,6,7,8,9].map(x=>[x,String(x)]),5,'num','numPrev')+'</div></div>'+
+  '<div class="two">'+fld('pc_name','Nome',{max:30,list:'tb-nomi',ph:pickNames(1,G.code,'f')[0]})+'<datalist id="tb-nomi">'+NAMES.f.concat(NAMES.u).map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>'+'<div class="fld"><label>Numero (2–9)</label>'+seg('pc_num',[2,3,4,5,6,7,8,9].map(x=>[x,String(x)]),5,'num','numPrev')+'</div></div>'+
   '<p class="hint" id="rngPrev">'+rngText(n)+'. Più basso = più magia, più alto = più combattimento.</p>'+
   '<details class="tips"><summary>Esempi</summary><ul><li><b>Tha</b> (3): mani nude, magia umana, spaventosa; tunica e mantello, spilla a forma di teschio, bastone troll nodoso.</li><li><b>Retta</b> (7): armi da lancio, magia troll, divertente; due piccole asce, un sasso fortunato, la lettera di un capitano di mare.</li><li><b>Kreshk</b> (6): mani nude, magia troll, grintosa; capelli a soffione, occhiali, una piuma appesa all’orecchio.</li><li><b>Bniri</b> (4): armi in mano, magia umana, distaccata; vesti da ricca, spada lunga, un bastoncino troll da masticare al collo.</li></ul></details>'+
   '<div class="fld"><label>Impressione di combattimento</label>'+seg('pc_fight',Object.keys(IMP_FIGHT).map(k=>[k,IMP_FIGHT[k]]),'melee')+'</div>'+
@@ -400,8 +408,24 @@ function pTbCreate(){
   '<div class="two">'+fld('pc_hair','Capelli',{ph:'crespi a soffione, lisci e neri…'})+fld('pc_horns','Corna',{ph:'corte da capra, coniche e dritte…'})+'</div>'+
   '<div class="two">'+fld('pc_hum','Oggetto umano',{ph:'la lettera di un capitano, un gioiello lavorato…'})+fld('pc_troll','Oggetto troll',{ph:'un sasso fortunato, un bastoncino da masticare…'})+'</div>'+
   '<div class="two">'+fld('pc_cloth','Abiti',{ph:'gilet allacciato, calzoni larghi, scalza…'})+fld('pc_kit','Arma o equipaggiamento',{ph:'due piccole asce da lancio'})+'</div>'+
-  '<div class="fld"><label>Dove sta andando? (a piedi)</label>'+seg('pc_loc',LOCS.map(l=>[l.id,esc(l.name),l.hint]),null,'locs')+'</div>'+
-  btn('Parti','createPC','primary')+'</div>';
+  btn('Avanti: dove va','createPC','primary')+'</div>';
+}
+function travelMap(){
+ if(G.map)return G.map;
+ const w=WORLDS[D.tv_world]?D.tv_world:'fiordi';
+ ui.mapSeed=ui.mapSeed||rid(6);
+ if(!ui.mapDraft||ui.mapDraft.code!==G.code||ui.mapDraft.m.mode!==w||ui.mapDraft.m.seed!==ui.mapSeed)ui.mapDraft={code:G.code,m:newMap(ui.mapSeed,w)};
+ return ui.mapDraft.m;
+}
+function pTravel(){
+ const first=!G.map,m=travelMap(),p=ui.mapPick;
+ return '<div class="form"><h3>Dove va '+esc(pcName(G))+'?</h3>'+
+  (first?'<div class="fld"><label>Che mondo immagini?</label>'+seg('tv_world',Object.keys(WORLDS).map(k=>[k,WORLDS[k].label]),'fiordi','','tvWorld')+'</div>':'')+
+  '<p class="hint">Tocca la mappa nel punto dove vuole andare, a piedi: un luogo con nome oppure un punto qualsiasi sulla terra.'+(first?' La mappa resterà la stessa per tutta la partita.':'')+'</p>'+
+  '<canvas class="mapcv pick" data-map="pick" role="img" aria-label="Mappa del mondo: tocca un punto per scegliere la destinazione"></canvas>'+
+  '<p class="dest">'+(p?'<b>'+esc(p.name)+'</b>'+(p.hint?' — '+esc(p.hint):''):'<span class="muted">Nessuna destinazione scelta.</span>')+'</p>'+
+  '<details class="tips"><summary>Scegli dall’elenco</summary>'+seg('tv_place',m.places.filter(isDest).map(x=>[x.id,esc(x.name),esc(x.hint||'')]),null,'locs','tvPlace')+'</details>'+
+  '<div class="row">'+btn(p?'Parti verso '+esc(p.name):'Parti','travel','primary')+(first?btn('Un’altra mappa','tvReroll','ghost'):'')+'</div></div>';
 }
 function rngText(n){const r=ranges(n);return 'Numero '+n+': Fighting '+rangeText(r.fighting)+' · Magic '+rangeText(r.magic)+' · Social '+rangeText(r.social);}
 function pGmPrep(){
@@ -412,7 +436,7 @@ function pGmPrep(){
   fld('gp_where','Dove',{rows:2,ph:'es. monti bassi e tozzi, valli strette, nebbia tra i pini'})+fld('gp_who','Chi c’è',{rows:2,ph:'es. famiglie troll sparse nelle valli; un giovane guerriero umano venuto a uccidere un troll'})+
   fld('gp_stakes','Stakes',{ph:'es. Ree-Shah, ragazza umana cresciuta dai troll, che lo sciamano vuole trasformare in troll'})+
   '<div class="two">'+fld('gp_a','Esito A',{ph:'es. resta con la tribù'})+fld('gp_b','Esito B',{ph:'es. torna tra gli umani'})+'</div>'+
-  fld('gp_chars','Personaggi (uno per riga: Nome — cosa vuole)',{rows:4,ph:'Gallg — vecchio sciamano malato, vuole una troll che lo sostituisca\nOskel — guerriero giovane e spavaldo, vuole il suo primo troll'})+fld('gp_notes','Note segrete',{rows:2})+
+  fld('gp_chars','Personaggi (uno per riga: Nome — cosa vuole)',{rows:4,ph:'Gallg — vecchio sciamano malato, vuole una troll che lo sostituisca\nOskel — guerriero giovane e spavaldo, vuole il suo primo troll'})+'<p class="hint">Nomi umani liberi: '+pickNames(10,G.code+':'+G.adv).join(', ')+'.</p>'+fld('gp_notes','Note segrete',{rows:2})+
   btn('Salva e apri la prima scena','savePrep','primary')+'</div>';
 }
 function pSceneOpen(){
@@ -547,7 +571,6 @@ function pInterim(){
   '<div class="fld"><label>Numero di '+esc(pc.name)+' (ora '+pc.number+')</label>'+seg('im_delta',[[-1,'−1'],[0,'Invariato'],[1,'+1']],0)+'</div>'+
   rels.map(r=>'<div class="fld"><label>'+esc(r.name)+' ('+REL_TYPES[r.type].toLowerCase()+')</label>'+seg('im_r_'+r.id,[['keep','Tieni'],['drop','Sciogli']].concat(r.type==='lover'?[]:[['swap',r.type==='ally'?'Rendi avversario':'Rendi alleato']]),'keep')+'</div>').join('')+
   (g.scale<7?'<div class="fld"><label>Scale (ora '+g.scale+': '+SCALES[g.scale-1]+')</label>'+seg('im_scale',[['no','Resta'],['yes','Sale di 1']],'no')+'</div>':'')+
-  '<div class="fld"><label>Dove va ora?</label>'+seg('im_loc',LOCS.map(l=>[l.id,esc(l.name),l.hint]),null,'locs')+'</div>'+
   btn('Si parte','interim','primary')+'</div>';
 }
 
@@ -611,10 +634,9 @@ const ACT={
  async askSkip(){await A.ooc('tb','Interpreta tu.',{chat:1});await A.askClose();},
  async createPC(){
   const name=v('pc_name');if(!name)throw 'Dai un nome alla trollbabe.';
-  if(!D.pc_loc)throw 'Scegli dove sta andando.';
   const f=n=>v(n)||'—';
-  await A.createPC({name:name,number:parseInt(D.pc_num,10)||5,magic:D.pc_magic,fight:D.pc_fight,social:D.pc_social,hair:f('pc_hair'),horns:f('pc_horns'),hum:f('pc_hum'),troll:f('pc_troll'),cloth:f('pc_cloth'),kit:f('pc_kit')},parseInt(D.pc_loc,10));
-  clear('pc_name','pc_hair','pc_horns','pc_hum','pc_troll','pc_cloth','pc_kit','pc_loc');
+  await A.createPC({name:name,number:parseInt(D.pc_num,10)||5,magic:D.pc_magic,fight:D.pc_fight,social:D.pc_social,hair:f('pc_hair'),horns:f('pc_horns'),hum:f('pc_hum'),troll:f('pc_troll'),cloth:f('pc_cloth'),kit:f('pc_kit')});
+  clear('pc_name','pc_hair','pc_horns','pc_hum','pc_troll','pc_cloth','pc_kit');
  },
  async genPrep(){
   if(!sample)throw 'L’IA non è disponibile in questa vista.';
@@ -684,11 +706,18 @@ const ACT={
   if(!outText)throw 'Dì quale esito degli Stakes avviene.';
   await A.finishEnding(outText,v('en_text'),PRIV);clear('en_text','en_free','en_out');
  },
+ tvWorld(){ui.mapPick=null;bump();},
+ tvReroll(){ui.mapSeed=rid(6);ui.mapPick=null;bump();},
+ tvPlace(sb){ui.mapPick=travelMap().places.find(p=>p.id===sb.dataset.val)||null;bump();},
+ async travel(){
+  const p=ui.mapPick;if(!p)throw 'Tocca la mappa nel punto dove vuole andare.';
+  if(!await A.travel(G.map?null:travelMap(),p))throw 'Partenza non riuscita: riprova.';
+  ui.mapPick=null;ui.mapDraft=null;ui.mapSeed=null;clear('tv_place','tv_world');
+ },
  async interim(){
-  if(!D.im_loc)throw 'Scegli dove va ora.';
   const rels={};G.rels.forEach(r=>{rels[r.id]=D['im_r_'+r.id]||'keep';});
-  await A.interim({delta:parseInt(D.im_delta,10)||0,rels:rels,scaleUp:D.im_scale==='yes',loc:parseInt(D.im_loc,10)});
-  clear('im_delta','im_scale','im_loc');G.rels.forEach(r=>clear('im_r_'+r.id));
+  await A.interim({delta:parseInt(D.im_delta,10)||0,rels:rels,scaleUp:D.im_scale==='yes'});
+  clear('im_delta','im_scale');G.rels.forEach(r=>clear('im_r_'+r.id));
  },
  async exportDiary(){
   let t='# Trollbabe — partita '+G.code+'\n\n';
@@ -717,6 +746,13 @@ async function runAct(el){
 function setupEvents(){
  document.addEventListener('input',e=>{const n=e.target&&e.target.dataset&&e.target.dataset.d;if(n)D[n]=e.target.value;});
  document.addEventListener('click',e=>{
+  const mc=e.target.closest('canvas[data-map="pick"]');
+  if(mc&&G&&G.step==='travel'){
+   const r=mc.getBoundingClientRect();if(!r.width)return;
+   const p=placeAt(travelMap(),(e.clientX-r.left)/r.width*MAP_W,(e.clientY-r.top)/r.height*MAP_H);
+   if(!p){toast('Lì c’è il mare: scegli un punto sulla terra.');return;}
+   ui.mapPick=p;D.tv_place=p.id;bump();return;
+  }
   const sb=e.target.closest('.seg button');
   if(sb){
    const s=sb.closest('.seg');D[s.dataset.seg]=sb.dataset.val;

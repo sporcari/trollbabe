@@ -17,7 +17,7 @@ const eq=(a,b,m)=>assert.strictEqual(a,b,m+' (atteso '+b+', trovato '+a+')');
   eq(TA.G.seats.tb.uid,'uSolo','con la scelta esplicita occupa l’altro posto');eq(TA3.ROLE,'tb','ruolo per scheda');eq(TA.ROLE,'gm','la prima scheda resta GM');eq(TA.G.step,'tb_create','avanza');
   console.log('A OK: ingresso, rientro e prova da solo con due schede');
   // --- XSS e testi
-  await TA3.A.createPC({name:'<img src=x onerror=window.__xss=1>',number:5,magic:'troll',fight:'melee',social:'fun',hair:'"><b>x</b>',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);
+  await TA3.A.createPC({name:'<img src=x onerror=window.__xss=1>',number:5,magic:'troll',fight:'melee',social:'fun',hair:'"><b>x</b>',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await TA3.go();
   await sleep(150);
   await TA.A.savePrep({stakes:'S<b>',a:'A',b:'B',chars:'<script>window.__xss=2</script>',where:'',who:'',notes:''});
   await sleep(150);

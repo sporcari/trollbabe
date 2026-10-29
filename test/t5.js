@@ -7,7 +7,7 @@ async function setup(num){
   await sleep(120);T=w.__TB;
   T.D.n_name='M';T.D.n_role='gm';T.D.n_other='human';await T.ACT.newGame();await sleep(30);
   w2.__TB.D.j_code=T.G.code;w2.__TB.D.j_name='T';await w2.__TB.ACT.joinGame();await sleep(80);
-  await T.A.createPC({name:'Retta',number:num||6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);
+  await T.A.createPC({name:'Retta',number:num||6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await T.go();
   await T.A.savePrep({stakes:'S',a:'A',b:'B',chars:'',where:'',who:'',notes:''});
   await T.A.openScene('Scena',['Orm'],false);
 }
@@ -77,13 +77,14 @@ const C=()=>T.G.conflict;
   eq(T.G.reveal.stakes,'S','reveal');
   await T.A.say('gm','x');// no-op fuori scena
   const ck=T.G.checked.slice();
-  await T.A.interim({delta:1,rels:{},scaleUp:true,loc:8});
-  eq(T.G.pc.number,7,'numero +1');eq(T.G.scale,2,'scale 2');eq(T.G.loc,8,'loc');eq(T.G.step,'gm_prep','prep');eq(T.G.checked.length,0,'checked azzerati');eq(T.G.adv,2,'adv');eq(T.G.scene,0,'scena');eq(T.G.reveal,null,'reveal azzerato');
+  const prev=T.G.loc;await T.A.interim({delta:1,rels:{},scaleUp:true});eq(T.G.step,'travel','dopo l’interim si sceglie dove andare');
+  const dest=T.G.map.places.find(p=>p.kind==='costa'&&p.id!==prev);await T.A.travel(null,dest);
+  eq(T.G.pc.number,7,'numero +1');eq(T.G.scale,2,'scale 2');eq(T.G.loc,dest.id,'loc');eq(T.G.locName,dest.name,'nome del luogo');eq(T.G.step,'gm_prep','prep');eq(T.G.checked.length,0,'checked azzerati');eq(T.G.adv,2,'adv');eq(T.G.scene,0,'scena');eq(T.G.reveal,null,'reveal azzerato');
   console.log('F OK: interim (numero, Scale, destinazione, reset delle voci)');
   // clamp del numero
   await setup(9);await conflict(1);await T.A.roll(10);// 9 fighting: riesce con 1-8, 10 fallisce
   await T.A.narrTB('x',null);await T.A.relSkip();await T.A.beginEnding();await T.A.finishEnding('A','e',null);
-  await T.A.interim({delta:1,rels:{},scaleUp:false,loc:1});eq(T.G.pc.number,9,'numero non supera 9');
+  await T.A.interim({delta:1,rels:{},scaleUp:false});eq(T.G.pc.number,9,'numero non supera 9');
   console.log('G OK: numero limitato a 9');
   process.exit(0);
 })().catch(e=>{console.error('FAIL',e.stack||e);process.exit(1);});

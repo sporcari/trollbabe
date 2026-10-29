@@ -17,7 +17,7 @@ const has=(t,s,m)=>assert.ok(t.indexOf(s)>=0,m+': manca «'+s+'»');
   const ru=side(w2).textContent;
   has(ru,'puoi alzarlo o abbassarlo di 1','numero');has(ru,'prima di ogni tiro dici cosa fai','azione prima del tiro');
   has(ru,'il portone resta in piedi','Goal sopra lo Scale');has(ru,'Non puoi salvare la città','Scale');has(ru,'il mare in cui ti tuffi','luoghi come avversari');
-  await T.A.createPC({name:'Tha',number:3,magic:'human',fight:'unarmed',social:'scary',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);await sleep(120);
+  await T.A.createPC({name:'Tha',number:3,magic:'human',fight:'unarmed',social:'scary',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await T.go();await sleep(120);
   // preparazione: esempio delle Stumpy Mountains e promemoria
   const pr=dock(w).innerHTML;
   has(pr,'Ree-Shah','esempio degli Stakes');has(pr,'resta con la tribù','esiti');has(pr,'Gallg','personaggi');

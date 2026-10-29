@@ -7,7 +7,7 @@ const assert=require('assert');
   TA.D.n_name='M';TA.D.n_role='gm';TA.D.n_other='human';await TA.ACT.newGame();await sleep(60);
   TB.D.j_code=TA.G.code;TB.D.j_name='T';await TB.ACT.joinGame();await sleep(100);
   const S=()=>sleep(120);
-  await TB.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);await S();
+  await TB.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await TB.go();await S();
   await TA.A.savePrep({stakes:'S',a:'A',b:'B',chars:'',where:'',who:'',notes:''});await S();
   await TA.A.openScene('Scena',[],false);await S();
   await TB.A.declare('tb',{type:'fighting',pace:1,goal:'g'});await S();await TA.A.paceAdj('keep');await S();

@@ -3,7 +3,8 @@ const {gmBot,runUntil}=require('./bots');
 const assert=require('assert');
 const scan=(w,tag)=>{const t=['#start','#game','#toast'].map(q=>w.document.querySelector(q).textContent).join(' ');for(const bad of ['undefined','NaN','[object']){if(t.indexOf(bad)>=0){const i=t.indexOf(bad);throw new Error('['+tag+'] testo sospetto "'+bad+'" nel DOM: …'+t.slice(Math.max(0,i-60),i+60));}}};
 const ai={
-  pc_create:()=>({name:'Skah',number:3,fight:'unarmed',magic:'human',social:'scary',hair:'neri',horns:'a capra',hum:'un libro',troll:'una pelle',cloth:'tunica',kit:'bastone',loc:8}),
+  pc_create:()=>({name:'Skah',number:3,fight:'unarmed',magic:'human',social:'scary',hair:'neri',horns:'a capra',hum:'un libro',troll:'una pelle',cloth:'tunica',kit:'bastone'}),
+  travel:(n,prompt)=>({place:/(p\d+): [^,]+, villaggio/.exec(prompt.split('=== NOTE ===')[1])[1]}),
   tb_act:(n)=>n===1?{text:'Skah avanza tra la nebbia.',conflict:null}:n===2?{text:'Skah afferra Hrenk per il bavero.',conflict:{type:'fighting',pace:2,goal:'Lo disarmo'}}:{text:'Skah osserva.',ask_end:true},
   goal:()=>({goal:'Lo convinco a lasciar stare'}),
   fair_tb:()=>({text:'Skah gonfia il petto.'}),
@@ -11,7 +12,7 @@ const ai={
   decide_tb:()=>({accept:false,item:'found',text:'Trova un sasso.',die:true}),
   rel_offer:(n)=>n===1?{form:true,name:'Hrenk',type:'opp',text:'Lo guarda male.'}:{form:false},
   tb_request:()=>({text:'Vado al fiume.',heal:true}),
-  interim:()=>({delta:-1,drop:[],scaleUp:false,loc:2}),
+  interim:()=>({delta:-1,drop:[],scaleUp:false}),
 };
 async function once(seed){
   const store=makeStore();

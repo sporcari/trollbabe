@@ -33,7 +33,7 @@ const fillModal=async(w,key,btn)=>{
   // ---------- 2. annullare la finestra
   const w2=makeStandalone(new Map(),{fetch:mkFetch({})});await sleep(250);const T2=w2.__TB;
   T2.D.n_name='S';T2.D.n_role='tb';T2.D.n_other='ai';await T2.ACT.newGame();await sleep(150);
-  Object.assign(T2.D,{pc_name:'Retta',pc_num:'6',pc_magic:'troll',pc_fight:'melee',pc_social:'fun',pc_loc:'4'});await T2.ACT.createPC();
+  Object.assign(T2.D,{pc_name:'Retta',pc_num:'6',pc_magic:'troll',pc_fight:'melee',pc_social:'fun'});await T2.ACT.createPC();await T2.ACT.tvPlace({dataset:{val:'p3'}});await T2.ACT.travel();
   await fillModal(w2,'','no');await sleep(300);
   assert.ok(T2.AI.err&&T2.AI.err.indexOf('negato')>=0,'messaggio di rifiuto: '+T2.AI.err);
   assert.ok(w2.document.querySelector('[data-act="aiRetry"]'),'manca Riprova');
@@ -45,7 +45,7 @@ const fillModal=async(w,key,btn)=>{
   // ---------- 3. chiave non valida
   const w3=makeStandalone(new Map(),{fetch:async()=>({ok:false,status:401,json:async()=>({error:{message:'invalid x-api-key'}})})});await sleep(250);const T3=w3.__TB;
   T3.D.n_name='S';T3.D.n_role='tb';T3.D.n_other='ai';await T3.ACT.newGame();await sleep(150);
-  Object.assign(T3.D,{pc_name:'Retta',pc_num:'6',pc_magic:'troll',pc_fight:'melee',pc_social:'fun',pc_loc:'4'});await T3.ACT.createPC();
+  Object.assign(T3.D,{pc_name:'Retta',pc_num:'6',pc_magic:'troll',pc_fight:'melee',pc_social:'fun'});await T3.ACT.createPC();await T3.ACT.tvPlace({dataset:{val:'p3'}});await T3.ACT.travel();
   await fillModal(w3,'sk-ant-SBAGLIATA');await sleep(400);
   assert.ok(T3.AI.err&&T3.AI.err.indexOf('chiave')>=0,'messaggio chiave non valida: '+T3.AI.err);
   assert.ok(!w3.__tbNet||true);

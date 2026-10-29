@@ -12,6 +12,7 @@ Lingua: tutto in italiano (interfaccia, commenti, messaggi di commit), con i ter
 ## File
 - `src/head.html`: stile (carta e inchiostro, chiaro/scuro) e scheletro.
 - `src/c1_core.js`: dati di gioco, regole pure (`ranges`, `rollOk`, `relCost`), scrittura condivisa (`tx`, `commit`, `deepDiff`), azioni `A.*`, `expected()`.
+- `src/c1m_map.js`: mappa del mondo (`newMap`, `terrain`, `placeAt`, `drawMap`): terreno dal seme, luoghi con nome salvati in `g.map.places`.
 - `src/c2_ui.js`: schermata iniziale, creazione/ingresso partita, `render()`, pannelli `p*()`, gestori `ACT.*`, eventi.
 - `src/c3_ai.js`: prompt (`GM_RULES`, `TB_RULES`, `TASKS`), `stateText`, lavori IA `J.*`, `nextAIJob`, `aiTick`, avvio (`boot`).
 - `src/shim.js`: ricrea `window.claude` fuori da Claude: db locale replicato via PeerJS, `sample` con chiave Anthropic dell'utente, presenza, download.
@@ -20,7 +21,7 @@ Lingua: tutto in italiano (interfaccia, commenti, messaggi di commit), con i ter
 ## Architettura in breve
 - Stato condiviso: documento `games/CODE` (campi `step`, `scene`, `turn`, `pc`, `rels` con `here`/`always`/`note`, `conflict{stage,kind,box,sb,fair{turn,round},step,...}`, `review`, `objection`, `seq`, `rev`) e diario in `games/CODE/log/NNNNNN-xxx`. Il diario cresce solo per aggiunte: un retcon è una voce `amend` con `meta.of` che sostituisce la voce indicata al momento di leggerla (`amendMap`, `textOf`); le voci `ooc` della chat laterale hanno `meta.chat` (più `ask` o `objection`). I dati privati (preparazione segreta del GM, indice delle partite) stanno in `data/users/<uid>/…` e **non vengono mai replicati né finiscono nei prompt della trollbabe**.
 - Ogni mossa è `A.xxx()` → `tx()` clona lo stato, applica, poi `commit()` scrive le voci di diario e **solo i campi cambiati** (`deepDiff` + `update` con unione ricorsiva): due scritture simultanee non si cancellano. `ver()` = `seq:rev` fa da guardia. Le note fuori gioco scrivono solo il diario.
-- Macchina a stati: `g.step` (`lobby, tb_create, gm_prep, scene_open, scene_play, scene_request, conflict, rel_offer, rel_approve, ending, interim`) e, nei conflitti, `conflict.stage` (`goal|pace|fair|step|roll|narr_gm|narr_tb|decide_tb|rels`). `expected()` dice chi deve agire; con `g.review` (il GM IA sta leggendo) o `g.objection` (eccezione aperta) il gioco è fermo.
+- Macchina a stati: `g.step` (`lobby, tb_create, travel, gm_prep, scene_open, scene_play, scene_request, conflict, rel_offer, rel_approve, ending, interim`) e, nei conflitti, `conflict.stage` (`goal|pace|fair|step|roll|narr_gm|narr_tb|decide_tb|rels`). `expected()` dice chi deve agire; con `g.review` (il GM IA sta leggendo) o `g.objection` (eccezione aperta) il gioco è fermo.
 - IA: `aiTick()` gira solo nel client dell'unico umano (con lease `locks/CODE-ai`); `nextAIJob()` sceglie il lavoro, `J.*` chiama `callAI()` e applica l'esito con le stesse azioni `A.*` dell'interfaccia. Se l'IA sbaglia: banner con «Riprova», nessun ciclo automatico.
 - Interfaccia: bozze dei campi in `D` (si conservano ai ridisegni), `render()` ridisegna il pannello solo se cambia `ver|ui.rev|…`.
 - Rete (solo `index.html`): l'host registra il peer `trollbabe-CODICE`; il guest si collega e invia `sync` con il proprio `uid`; l'host verifica (`allowed`) prima di rispondere e ignora scritture di chi non è verificato; poi ogni scrittura condivisa è replicata. Riconnessione automatica del guest ogni 4 s. Persistenza in `localStorage` (`tb:g:CODICE`, `tb:priv`).
@@ -38,6 +39,8 @@ Lingua: tutto in italiano (interfaccia, commenti, messaggi di commit), con i ter
 - La ferita ha senso rispetto al tipo di conflitto; la descrizione è salvata in `pc.hurt` e visibile all'IA finché non c'è una scena di cura.
 - Il GM IA ha un «ritmo morbido»: aperture di circa 50 parole, un solo PNG che agisce o parla, una mossa per volta, nessuna spinta verso gli Stakes, niente aperture «a missione». È una scelta della casa: il 2023 dice «se un conflitto si può chiamare, chiamalo».
 - L'incapacitata non entra in nuovi conflitti finché non c'è una scena di cura: il 2023 tace, il 2009 la farebbe tirare dall'ultimo box.
+- Mappa: dopo la creazione (e dopo ogni interim) la trollbabe sceglie il mondo la prima volta (arcipelago, continenti, fiordi) e tocca la destinazione; la mappa resta quella per tutta la partita. Il terreno si ricalcola dal seme (calcoli deterministici, niente `Math.pow`), nomi e coordinate stanno nello stato condiviso. I luoghi fissi del manuale non ci sono più.
+- Nomi: `NAMES` in `c1_core.js` (nomi vichinghi da terre-des-loups.fr) per la trollbabe e i PNG umani; `pickNames()` li suggerisce in interfaccia e nei prompt.
 - Una sola trollbabe per partita (il capitolo 8 sulle trollbabe multiple non è implementato). Niente libreria di avventure già pronte.
 - Magia: Saverio ricorda «la magia è sempre rischiosa»; non c'è in nessuna delle due edizioni. Lasciato com'è (scelta estetica da osservare in gioco).
 

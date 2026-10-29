@@ -222,6 +222,9 @@ body.chaton .e .q{display:inline-block}
 .verdict .row{margin:.4rem 0 0}
 .e.verdict{max-width:44rem;font-style:normal;text-align:left}
 .note.rv{background:var(--paper);border-color:var(--ink)}
+.mapcv{display:block;width:100%;aspect-ratio:680/440;border:1px solid var(--ink);background:var(--paper2)}
+.mapcv.pick{cursor:crosshair;touch-action:manipulation;margin:.2rem 0}
+.dest{font-family:var(--sans);margin:.4rem 0 .6rem}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -578,19 +581,19 @@ const rnd=n=>{try{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[
 const d10=()=>rnd(10)+1;
 
 /* ================= dati di gioco ================= */
-const LOCS=[
- {id:1,name:'Lazy Bog',hint:'palude'},
- {id:2,name:'Kjallr’s Wood',hint:'foresta'},
- {id:3,name:'The Rotten Teeth',hint:'scogli in mare'},
- {id:4,name:'Gyfrshal',hint:'luogo fortificato'},
- {id:5,name:'The High Lake',hint:'lago tra i monti'},
- {id:6,name:'Mount Yawny',hint:'montagna'},
- {id:7,name:'Smouldering Shores',hint:'coste fumanti'},
- {id:8,name:'Madman’s Henge',hint:'pietre erette'},
- {id:9,name:'The Singing Stones',hint:'pietre'},
- {id:10,name:'The Ice Palace',hint:'ghiaccio'},
- {id:11,name:'Leviathan Isles',hint:'isole nel mare'}
-];
+// nomi vichinghi per la trollbabe e i PNG umani (elenco di terre-des-loups.fr)
+const NAMES={
+ f:['Astrid','Freya','Ingrid','Sigrid','Ragnhild','Thora','Helga','Gudrun','Solveig','Signe','Runa','Liv','Yrsa','Aslaug','Hilde','Brynhild','Toril','Frida','Estrid','Gunnhild','Sigrun','Idun','Ulfhild','Ragnhilda','Alva','Lagertha'],
+ m:['Ragnar','Bjorn','Ulf','Erik','Harald','Sven','Ivar','Sigurd','Leif','Rolf','Olaf','Gunnar','Halfdan','Torstein','Magnus','Frode','Odd','Eirik','Knut','Snorri','Torbjorn','Alrek','Hakon','Ingvar','Torvald','Ulfar','Ulfvid','Bjornolf','Ingolfr','Torolf','Hrolfr','Ulfrik','Ubbe'],
+ u:['Kari','Ari','Bo','Sten','Ove']
+};
+// kinds: lettere di NAMES; esclude i nomi già in gioco
+function pickNames(n,seed,kinds){
+ const used=new Set(((G&&G.npcs)||[]).map(x=>x.name).concat(G&&G.pc?[G.pc.name]:[]));
+ const all=(kinds||'fmu').split('').reduce((a,k)=>a.concat(NAMES[k]||[]),[]).filter(x=>!used.has(x)),R=mulberry(hashStr(String(seed))),out=[];
+ while(out.length<n&&out.length<all.length){const x=all[Math.floor(R()*all.length)];if(out.indexOf(x)<0)out.push(x);}
+ return out;
+}
 const SCALES=['Persona','Piccolo gruppo','Gruppo organizzato','Villaggio','Comunità sostanziosa','Provincia','Terra'];
 const TYPES={
  fighting:{label:'Fighting',rule:'successo se il d10 è sotto il tuo numero',desc:'Solo violenza: sottomettere, mettere fuori gioco, uccidere. Niente dialogo né sfumature.'},
@@ -709,7 +712,6 @@ async function commit(g,entries,prevSeq,base){
 }
 
 /* ================= azioni (motore) ================= */
-function setLoc(g,id){const l=LOCS.find(x=>x.id===id)||LOCS[0];g.loc=l.id;g.locName=l.name;}
 function resetAdv(g){g.scene=0;g.checked=[];g.npcs=[];g.conflict=null;g.leaving=false;g.request=null;g.reveal=null;g.lastConflict=null;g.relResult=null;(g.rels||[]).forEach(r=>{r.checked=false;});}
 function addNpcs(g,list){
   (list||[]).forEach(n=>{n=String(n||'').trim().slice(0,60);if(n&&!g.npcs.some(x=>x.name.toLowerCase()===n.toLowerCase()))g.npcs.push({name:n});});
@@ -772,10 +774,20 @@ function addRel(g,o){
 }
 
 const A={
- createPC(pc,loc){return tx((g,push)=>{
+ createPC(pc){return tx((g,push)=>{
   if(g.pc)g.adv=(g.adv||1)+1;
-  g.pc=Object.assign({},pc,{status:'ok'});g.rels=[];setLoc(g,loc);resetAdv(g);g.step='gm_prep';
-  push('sys','',pc.name+' (numero '+pc.number+') si mette in cammino verso '+g.locName+'.');
+  g.pc=Object.assign({},pc,{status:'ok'});g.rels=[];g.loc=null;g.locName='';g.locHint='';resetAdv(g);g.step='travel';
+  push('sys','',pc.name+' (numero '+pc.number+') è pronta a mettersi in cammino.');
+ });},
+ // la prima partenza fissa anche la mappa del mondo, che poi resta la stessa per tutta la partita
+ travel(map,place){return tx((g,push)=>{
+  if(g.step!=='travel'||!place)return false;
+  if(!g.map){if(!map)return false;g.map=map;}
+  let p=g.map.places.find(x=>x.id===place.id);
+  if(!p){if(!place.fresh)return false;p=Object.assign({},place);delete p.fresh;g.map.places.push(p);}
+  if(!isDest(p))return false;
+  p.visited=true;g.loc=p.id;g.locName=p.name;g.locHint=p.hint||'';g.step='gm_prep';
+  push('sys','',pcName(g)+' si mette in cammino verso '+p.name+(p.hint?', '+p.hint:'')+'.');
  });},
  savePrep(priv){return (async()=>{
   await secret.set(CODE,priv);PRIV=priv;
@@ -830,8 +842,7 @@ const A={
    else if(m==='swap'&&r.type!=='lover'){r.type=r.type==='ally'?'opp':'ally';push('sys','',r.name+' diventa '+REL_TYPES[r.type].toLowerCase()+'.');}
   });
   if(o.scaleUp&&g.scale<7){g.scale++;push('sys','','Il Scale sale a '+g.scale+': '+SCALES[g.scale-1]+'.');}
-  g.adv=(g.adv||1)+1;setLoc(g,o.loc);resetAdv(g);g.step='gm_prep';
-  push('sys','',pcName(g)+' si dirige verso '+g.locName+'.');
+  g.adv=(g.adv||1)+1;resetAdv(g);g.step='travel';
  });},
  /* conflitti */
  declare(seat,o){return tx((g,push)=>{
@@ -970,7 +981,7 @@ function expected(g){
  if(g.objection)return ['tb'];
  const c=g.conflict;
  switch(g.step){
-  case 'tb_create':case 'scene_request':case 'rel_offer':case 'interim':return ['tb'];
+  case 'tb_create':case 'travel':case 'scene_request':case 'rel_offer':case 'interim':return ['tb'];
   case 'gm_prep':case 'scene_open':case 'rel_approve':case 'ending':return ['gm'];
   case 'scene_play':return [g.turn||'tb'];
   case 'conflict':
@@ -983,6 +994,183 @@ function expected(g){
    }
  }
  return [];
+}
+
+/* ================= mappa del mondo ================= */
+// Il terreno si ricalcola dal seme (niente immagini nello stato condiviso); nomi e coordinate dei luoghi
+// invece si salvano in g.map.places, così i due client li vedono uguali anche con font diversi.
+const MAP_W=680,MAP_H=440,MAP_CELL=4;
+const WORLDS={arcipelago:{label:'Arcipelago',land:.22},continenti:{label:'Grandi continenti',land:.42},fiordi:{label:'Fiordi e coste frastagliate',land:.48}};
+const SYL=['Skar','Hval','Ulf','Trond','Grim','Hel','Kvar','Brann','Fjal','Myr','Sig','Rav','Tor','Hjal','Ved','Ørn','Kjøl','Svart','Bjar','Stein','Hrafn','Ask','Dun','Frost','Lyng','Mor','Nid','Odd','Ran','Snø','Vind','Gnip','Tjørn'];
+const SUF={costa:['vik','nes','fjord','sund','havn','holm','by'],terra:['heim','stad','dal','gard','rud','vang','set'],isola:['øy','holm','ey','skjær'],picco:['tind','fjell','horn','berg'],riva:['nes','strand','vik'],entro:['dal','mark','skog','myr']};
+const MARI=['dei Corvi','dei Lupi','dei Ghiacci','dei Silenzi','delle Nebbie','dei Naufragi','delle Balene'];
+const KIND_HINT={costa:'villaggio sulla costa',terra:'villaggio nell’entroterra',picco:'picco',tana:'tana dei troll tra i monti',riva:'luogo sulla costa',monti:'luogo tra i monti',entro:'luogo nell’entroterra'};
+const DEST_KINDS=['costa','terra','picco','tana','riva','monti','entro'];
+
+function hashStr(s){let h=2166136261;for(const c of String(s))h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;}
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+// solo imul, floor e operazioni elementari: stesso risultato in ogni browser (niente Math.pow)
+function noiseFor(seed){
+ const sh=hashStr(seed)|0;
+ const hs=(x,y)=>{let h=Math.imul(x,374761393)+Math.imul(y,668265263)+sh|0;h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296;};
+ const vn=(x,y)=>{const ix=Math.floor(x),iy=Math.floor(y),fx=x-ix,fy=y-iy,sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);const a=hs(ix,iy),b=hs(ix+1,iy),c=hs(ix,iy+1),d=hs(ix+1,iy+1);return a+(b-a)*sx+(c-a)*sy+(a-b-c+d)*sx*sy;};
+ return (x,y,o,p)=>{let a=1,f=1,s=0,n=0;for(let i=0;i<o;i++){s+=a*vn(x*f+i*17.3,y*f-i*9.1);n+=a;a*=p;f*=2;}return s/n;};
+}
+const TERRAIN={key:null,t:null};
+function terrain(m){
+ const key=m.seed+'|'+m.mode+'|'+m.land+'|'+m.rough;
+ if(TERRAIN.key===key)return TERRAIN.t;
+ const W=MAP_W,H=MAP_H,fbm=noiseFor(m.seed),rough=m.rough,E=new Float32Array(W*H),asp=W/H,pers=.45+.15*rough;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const nu=x/W,nv=y/H,u=nu*asp,v=nv,ed=Math.max(Math.abs(2*nu-1),Math.abs(2*nv-1)),fall=ed*ed*ed*ed;
+  const wf=m.mode==='continenti'?3:4,w=(m.mode==='continenti'?.35:m.mode==='arcipelago'?.25:.3)*rough;
+  const wx=u+w*(fbm(u*wf,v*wf,3,.5)-.5)*2,wy=v+w*(fbm(u*wf+5.2,v*wf+1.3,3,.5)-.5)*2;
+  let e;
+  if(m.mode==='continenti')e=fbm(wx*1.8,wy*1.8,6,pers)-.45*fall;
+  else if(m.mode==='arcipelago')e=fbm(wx*7,wy*7,4,pers)-.15*fall;
+  else{const r=1-Math.abs(2*fbm(wx*6,wy*6,3,.5)-1),r2=r*r;e=fbm(wx*1.6,wy*1.6,5,pers)-(.08+.3*rough)*r2*r2*r2-.4*fall;}
+  E[y*W+x]=e;
+ }
+ const s=[];for(let i=0;i<E.length;i+=7)s.push(E[i]);s.sort((a,b)=>a-b);
+ const sea=s[Math.floor((1-m.land)*s.length)],mx=s[s.length-1];
+ const L=new Uint8Array(W*H);for(let i=0;i<E.length;i++)L[i]=E[i]>sea?1:0;
+ // distanza dalla costa (per terra e mare), chamfer a due passate
+ const D=new Float32Array(W*H).fill(1e9);
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(x<W-1&&L[i]!==L[i+1])D[i]=D[i+1]=0;if(y<H-1&&L[i]!==L[i+W])D[i]=D[i+W]=0;}
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;let v=D[i];if(x>0)v=Math.min(v,D[i-1]+1);if(y>0){v=Math.min(v,D[i-W]+1);if(x>0)v=Math.min(v,D[i-W-1]+1.414);if(x<W-1)v=Math.min(v,D[i-W+1]+1.414);}D[i]=v;}
+ for(let y=H-1;y>=0;y--)for(let x=W-1;x>=0;x--){const i=y*W+x;let v=D[i];if(x<W-1)v=Math.min(v,D[i+1]+1);if(y<H-1){v=Math.min(v,D[i+W]+1);if(x<W-1)v=Math.min(v,D[i+W+1]+1.414);if(x>0)v=Math.min(v,D[i+W-1]+1.414);}D[i]=v;}
+ // terre emerse (componenti connesse su una griglia di 4 px)
+ const gw=W/MAP_CELL|0,gh=H/MAP_CELL|0,C=new Int32Array(gw*gh).fill(-1),comps=[],cp=c=>((c/gw|0)*MAP_CELL+2)*W+(c%gw)*MAP_CELL+2;
+ for(let c=0;c<gw*gh;c++){
+  if(!L[cp(c)]||C[c]>=0)continue;
+  const id=comps.length,q=[c];C[c]=id;let area=0,best=cp(c);
+  while(q.length){const k=q.pop(),kx=k%gw,ky=k/gw|0,kp=cp(k);area++;if(D[kp]>D[best])best=kp;
+   for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=kx+dx,ny=ky+dy;if(nx<0||ny<0||nx>=gw||ny>=gh)continue;const n=ny*gw+nx;if(C[n]<0&&L[cp(n)]){C[n]=id;q.push(n);}}}
+  comps.push({id:id,area:area,x:best%W,y:best/W|0});
+ }
+ const t={E:E,L:L,D:D,sea:sea,mx:mx,C:C,gw:gw,comps:comps,hn:i=>(E[i]-sea)/(mx-sea)};
+ t.comp=(x,y)=>{const cx=clamp(x/MAP_CELL|0,0,gw-1),cy=clamp(y/MAP_CELL|0,0,gh-1);return C[cy*gw+cx];};
+ TERRAIN.key=key;TERRAIN.t=t;
+ return t;
+}
+function mapNamer(m,salt){
+ const R=mulberry(hashStr(m.seed+'#'+(salt!=null?salt:m.places?m.places.length:0)));
+ const names=(m.places||[]).map(p=>p.name),used=new Set(names),pick=a=>a[Math.floor(R()*a.length)];
+ // radici diverse per luoghi diversi: «Torøy» e «Torey» sulla stessa mappa si confondono
+ const stems=new Set(SYL.filter(st=>names.some(n=>n.indexOf(st)>=0)));
+ const stem=()=>{let st='';for(let k=0;k<40;k++){st=pick(SYL);if(!stems.has(st))break;}stems.add(st);return st;};
+ return {R:R,pick:pick,stem:stem,name(t){let n='';for(let k=0;k<40;k++){n=(k<30?stem():pick(SYL))+pick(SUF[t]);if(!used.has(n))break;}used.add(n);return n;}};
+}
+function newMap(seed,mode){
+ mode=WORLDS[mode]?mode:'fiordi';
+ const m={seed:String(seed),mode:mode,land:WORLDS[mode].land,rough:.65,places:[]};
+ const t=terrain(m),W=MAP_W,H=MAP_H,N=mapNamer(m),R=N.R,places=m.places;
+ const far=(x,y,r)=>places.every(p=>p.kind==='isola'||p.kind==='terre'||p.kind==='mare'||(p.x-x)*(p.x-x)+(p.y-y)*(p.y-y)>r*r);
+ const add=(kind,name,x,y)=>{const p={id:'p'+places.length,name:name,kind:kind,x:x,y:y};const c=t.comp(x,y);if(c>=0)p.c=c;places.push(p);return p;};
+ const cand=[];for(let y=10;y<H-10;y+=4)for(let x=10;x<W-10;x+=4){const i=y*W+x;if(t.L[i]&&t.hn(i)>.68&&t.D[i]>6)cand.push([t.E[i],x,y]);}
+ cand.sort((a,b)=>b[0]-a[0]);
+ let np=0;for(const[,x,y]of cand){if(np>=3)break;if(far(x,y,100)){add(np?'picco':'tana',np?N.name('picco'):'Tana dei troll',x,y);np++;}}
+ const co=[],te=[];for(let y=12;y<H-12;y+=5)for(let x=12;x<W-12;x+=5){const i=y*W+x;if(!t.L[i])continue;if(t.D[i]>=2&&t.D[i]<=7)co.push({x:x,y:y});else if(t.D[i]>12)te.push({x:x,y:y});}
+ const sh=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));const x=a[i];a[i]=a[j];a[j]=x;}return a;};
+ [[sh(co),'costa',8],[sh(te),'terra',3]].forEach(([list,kind,max])=>{let k=0;for(const p of list){if(k>=max)break;if(far(p.x,p.y,62)){add(kind,N.name(kind),p.x,p.y);k++;}}});
+ const tot=t.comps.reduce((s,c)=>s+c.area,0);
+ t.comps.slice().sort((a,b)=>b.area-a.area).slice(0,7).forEach(c=>{
+  if(c.area<35)return;
+  const big=c.area>.35*tot&&mode!=='arcipelago';
+  const p=add(big?'terre':'isola',big?'Terre di '+N.stem()+N.pick(['land','mark','rike']):N.name('isola'),c.x,c.y);p.c=c.id;
+ });
+ let sp=null,sd=0;for(let y=20;y<H-20;y+=3)for(let x=40;x<W-40;x+=3){const i=y*W+x;if(!t.L[i]&&t.D[i]>sd){sd=t.D[i];sp={x:x,y:y};}}
+ if(sp)add('mare','Mare '+N.pick(MARI),sp.x,sp.y);
+ places.forEach(p=>{if(DEST_KINDS.indexOf(p.kind)>=0)p.hint=placeHint(m,p);});
+ return m;
+}
+function placeHint(m,p){
+ const land=p.c!=null&&(m.places||[]).find(q=>q.c===p.c&&(q.kind==='isola'||q.kind==='terre'));
+ return KIND_HINT[p.kind]+(land?(land.kind==='isola'?' di ':' nelle ')+land.name:'');
+}
+const isDest=p=>DEST_KINDS.indexOf(p.kind)>=0;
+// punto toccato sulla mappa: il luogo con nome più vicino, altrimenti un luogo nuovo; null se è mare
+function placeAt(m,x,y){
+ x=Math.round(clamp(x,0,MAP_W-1));y=Math.round(clamp(y,0,MAP_H-1));
+ let best=null,bd=22*22;
+ m.places.filter(isDest).forEach(p=>{const d=(p.x-x)*(p.x-x)+(p.y-y)*(p.y-y);if(d<bd){bd=d;best=p;}});
+ if(best)return best;
+ const t=terrain(m),i=y*MAP_W+x;
+ if(!t.L[i])return null;
+ const kind=t.D[i]<=6?'riva':t.hn(i)>.55?'monti':'entro';
+ const N=mapNamer(m,x+':'+y),p={id:'p'+m.places.length+'-'+hashStr(x+':'+y).toString(36).slice(0,4),name:N.name(kind==='monti'?'picco':kind),kind:kind,x:x,y:y,fresh:true};
+ const c=t.comp(x,y);if(c>=0)p.c=c;
+ p.hint=placeHint(m,p);
+ return p;
+}
+function mapNear(g,n){
+ const m=g.map,cur=m&&m.places.find(p=>p.id===g.loc);if(!cur)return [];
+ return m.places.filter(p=>isDest(p)&&p.id!==cur.id).sort((a,b)=>((a.x-cur.x)*(a.x-cur.x)+(a.y-cur.y)*(a.y-cur.y))-((b.x-cur.x)*(b.x-cur.x)+(b.y-cur.y)*(b.y-cur.y))).slice(0,n);
+}
+
+/* disegno: carta e inchiostro, colori presi dal tema */
+const MAPIMG={key:null,c:null};
+function hexRGB(s){s=String(s||'').trim().replace('#','');if(s.length===3)s=s.split('').map(c=>c+c).join('');const n=parseInt(s,16);return isNaN(n)?[128,128,128]:[n>>16&255,n>>8&255,n&255];}
+const mixRGB=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+function mapColors(){const cs=getComputedStyle(document.documentElement),g=n=>hexRGB(cs.getPropertyValue(n));return {P:g('--paper'),I:g('--ink'),F:g('--fjord'),font:(cs.getPropertyValue('--serif')||'serif').trim()};}
+function terrainImage(m,col){
+ const t=terrain(m),key=TERRAIN.key+'|'+col.P+col.I+col.F;
+ if(MAPIMG.key===key)return MAPIMG.c;
+ const W=MAP_W,H=MAP_H,o=document.createElement('canvas');o.width=W;o.height=H;
+ const oc=o.getContext('2d');if(!oc)return null;
+ const lb=mixRGB(col.P,[186,117,23],.07),sb=mixRGB(col.P,col.F,.16),img=oc.createImageData(W,H),px=img.data;
+ for(let i=0;i<t.E.length;i++){
+  const d=t.D[i];let c;
+  if(t.L[i]){const h=t.hn(i);c=mixRGB(lb,col.I,h>.45?.2*(h-.45)/.55:0);if(d<1.2)c=mixRGB(c,col.I,.85);}
+  else{c=sb;if(d<1.2)c=mixRGB(c,col.I,.85);else{const a=Math.abs(d-4)<.6?.35:Math.abs(d-9)<.5?.22:Math.abs(d-15)<.5?.12:0;c=mixRGB(c,col.I,a);}}
+  px[i*4]=c[0];px[i*4+1]=c[1];px[i*4+2]=c[2];px[i*4+3]=255;
+ }
+ oc.putImageData(img,0,0);
+ const R=mulberry(hashStr(m.seed+'^'));oc.strokeStyle='rgb('+col.I.join(',')+')';oc.lineWidth=1;oc.lineJoin='round';
+ for(let y=8;y<H-8;y+=13)for(let x=8;x<W-8;x+=13){
+  const jx=Math.round(x+(R()-.5)*8),jy=Math.round(y+(R()-.5)*8),i=jy*W+jx,h=t.hn(i);
+  if(!t.L[i]||h<.52||t.D[i]<5)continue;
+  if(m.places.some(p=>isDest(p)&&(p.x-jx)*(p.x-jx)+(p.y-jy)*(p.y-jy)<196))continue;
+  const z=3+5*(h-.52)/.48;
+  oc.beginPath();oc.moveTo(jx-z,jy+z*.6);oc.lineTo(jx,jy-z*.7);oc.lineTo(jx+z,jy+z*.6);oc.stroke();
+  oc.beginPath();oc.moveTo(jx,jy-z*.7);oc.lineTo(jx+z*.3,jy+z*.6);oc.stroke();
+ }
+ MAPIMG.key=key;MAPIMG.c=o;
+ return o;
+}
+// o: {cur: id del luogo attuale, pick: luogo scelto (anche nuovo)}
+function drawMap(cv,m,o){
+ o=o||{};
+ let ctx=null;try{ctx=cv.getContext('2d');}catch(e){}
+ if(!ctx)return;
+ const col=mapColors(),img=terrainImage(m,col);if(!img)return;
+ const dpr=window.devicePixelRatio||1,W=MAP_W,H=MAP_H;
+ cv.width=W*dpr;cv.height=H*dpr;
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.drawImage(img,0,0,W,H);
+ const ink='rgb('+col.I.join(',')+')',paper='rgb('+mixRGB(col.P,[186,117,23],.07).map(Math.round).join(',')+')',rune=getComputedStyle(document.documentElement).getPropertyValue('--rune').trim()||ink;
+ const rects=[];
+ const hit=r=>r.x<2||r.y<2||r.x+r.w>W-2||r.y+r.h>H-2||rects.some(q=>r.x<q.x+q.w&&r.x+r.w>q.x&&r.y<q.y+q.h&&r.y+r.h>q.y);
+ const label=(t,x,y,font,alpha,center,color)=>{
+  ctx.font=font;const w=ctx.measureText(t).width,h=14;
+  const opts=center?[[x-w/2,y-h/2]]:[[x+7,y-h/2],[x-7-w,y-h/2],[x-w/2,y-h-6],[x-w/2,y+6]];
+  for(const[ax,ay]of opts){const r={x:ax-2,y:ay-1,w:w+4,h:h+2};if(hit(r))continue;rects.push(r);
+   ctx.textBaseline='top';ctx.lineWidth=3;ctx.strokeStyle=paper;ctx.globalAlpha=1;ctx.strokeText(t,ax,ay);ctx.globalAlpha=alpha;ctx.fillStyle=color||ink;ctx.fillText(t,ax,ay);ctx.globalAlpha=1;return;}
+ };
+ const all=m.places.concat(o.pick&&!m.places.some(p=>p.id===o.pick.id)?[o.pick]:[]);
+ const rank=p=>p.id===(o.pick&&o.pick.id)?0:p.id===o.cur?1:p.visited?2:3;
+ const dest=all.filter(isDest).sort((a,b)=>rank(a)-rank(b));
+ dest.forEach(p=>rects.push({x:p.x-5,y:p.y-5,w:10,h:10}));
+ dest.slice().reverse().forEach(p=>{
+  const hl=rank(p)<2;ctx.fillStyle=paper;ctx.beginPath();ctx.arc(p.x,p.y,hl?7:4,0,7);ctx.fill();
+  ctx.fillStyle=hl?rune:ink;ctx.strokeStyle=hl?rune:ink;
+  if(p.kind==='picco'||p.kind==='tana'||p.kind==='monti'){ctx.beginPath();ctx.moveTo(p.x-6,p.y+5);ctx.lineTo(p.x,p.y-6);ctx.lineTo(p.x+6,p.y+5);ctx.closePath();ctx.fill();}
+  else{ctx.beginPath();ctx.arc(p.x,p.y,p.visited||hl?3:2.6,0,7);if(p.visited&&!hl){ctx.lineWidth=1.4;ctx.stroke();}else ctx.fill();}
+  if(hl){ctx.lineWidth=1.6;ctx.beginPath();ctx.arc(p.x,p.y,9,0,7);ctx.stroke();}
+ });
+ dest.forEach(p=>{const hl=rank(p)<2;label(p.name,p.x,p.y,(hl?'600 13px ':(p.kind==='costa'||p.kind==='terra'?'':'italic ')+'12px ')+col.font,1,false,hl?rune:null);});
+ all.filter(p=>p.kind==='isola'||p.kind==='terre').forEach(p=>label(p.name,p.x,p.y,'italic 15px '+col.font,.75,true));
+ all.filter(p=>p.kind==='mare').forEach(p=>label(p.name,p.x,p.y,'italic 15px '+col.font,.6,true));
+ ctx.strokeStyle=ink;ctx.lineWidth=1;ctx.strokeRect(.5,.5,W-1,H-1);
 }
 /* ================= UI: helper ================= */
 const nl=t=>esc(t).replace(/\n/g,'<br>');
@@ -1150,7 +1338,7 @@ function render(){
  if(G.step!=='scene_play')ui.declaring=false;
  if(!G.conflict||G.conflict.stage!=='fair')delete D.fr_text;
  renderTop();
- const fm=['tb_create','gm_prep','interim','lobby'].indexOf(G.step)>=0;
+ const fm=['tb_create','travel','gm_prep','interim','lobby'].indexOf(G.step)>=0;
  $('.col').classList.toggle('formmode',fm);
  const chatOn=chatAvail(),nChat=LOG.filter(isChat).length;
  document.body.classList.toggle('chaton',chatOn);
@@ -1163,10 +1351,16 @@ function render(){
  if(k!==lastKey){lastKey=k;redraw($('#dock-body'),dockHTML());}
 }
 // ridisegna conservando focus e cursore del campo che si sta scrivendo
+function drawMaps(el){
+ $$('canvas[data-map]',el).forEach(cv=>{
+  const pick=cv.dataset.map==='pick',m=pick?travelMap():G&&G.map;
+  if(m)drawMap(cv,m,{cur:G.loc,pick:pick?ui.mapPick:null});
+ });
+}
 function redraw(el,html){
  const ae=document.activeElement,nm=ae&&el.contains(ae)&&ae.dataset&&ae.dataset.d;let pos=null;
  if(nm&&ae.selectionStart!=null)pos=[ae.selectionStart,ae.selectionEnd];
- el.innerHTML=html;
+ el.innerHTML=html;drawMaps(el);
  const n=nm&&el.querySelector('[data-d="'+nm+'"]');
  if(n){n.focus();try{if(pos)n.setSelectionRange(pos[0],pos[1]);}catch(e){}}
 }
@@ -1252,6 +1446,7 @@ function sideHTML(){
  if(ui.tab==='more')return moreHTML();
  if(ui.tab==='chat')return chatHTML();
  let h='<div class="card slim"><div class="k">Scale</div><b>'+g.scale+' · '+SCALES[g.scale-1]+'</b></div>';
+ if(g.map)h+='<div class="card slim"><div class="k">Mappa</div><canvas class="mapcv" data-map="side" role="img" aria-label="Mappa del mondo"></canvas>'+(g.locName?'<p class="hint">'+esc(g.locName)+(g.locHint?' — '+esc(g.locHint):'')+'</p>':'')+'</div>';
  const pc=g.pc;
  if(pc){
   const r=ranges(pc.number);
@@ -1347,6 +1542,7 @@ function dockHTML(){
   case 'rel_approve':h=ROLE==='gm'?pRelApprove():waitHTML(['gm']);break;
   case 'ending':h=ROLE==='gm'?pEnding():waitHTML(['gm']);break;
   case 'interim':h=ROLE==='tb'?pInterim():waitHTML(['tb']);break;
+  case 'travel':h=ROLE==='tb'?pTravel():waitHTML(['tb']);break;
  }
  return h+oocHTML();
 }
@@ -1377,7 +1573,7 @@ function pLobby(){
 function pTbCreate(){
  const n=parseInt(D.pc_num,10)||5;
  return '<div class="form"><h3>Crea la tua trollbabe</h3>'+
-  '<div class="two">'+fld('pc_name','Nome',{max:30})+'<div class="fld"><label>Numero (2–9)</label>'+seg('pc_num',[2,3,4,5,6,7,8,9].map(x=>[x,String(x)]),5,'num','numPrev')+'</div></div>'+
+  '<div class="two">'+fld('pc_name','Nome',{max:30,list:'tb-nomi',ph:pickNames(1,G.code,'f')[0]})+'<datalist id="tb-nomi">'+NAMES.f.concat(NAMES.u).map(n=>'<option value="'+esc(n)+'">').join('')+'</datalist>'+'<div class="fld"><label>Numero (2–9)</label>'+seg('pc_num',[2,3,4,5,6,7,8,9].map(x=>[x,String(x)]),5,'num','numPrev')+'</div></div>'+
   '<p class="hint" id="rngPrev">'+rngText(n)+'. Più basso = più magia, più alto = più combattimento.</p>'+
   '<details class="tips"><summary>Esempi</summary><ul><li><b>Tha</b> (3): mani nude, magia umana, spaventosa; tunica e mantello, spilla a forma di teschio, bastone troll nodoso.</li><li><b>Retta</b> (7): armi da lancio, magia troll, divertente; due piccole asce, un sasso fortunato, la lettera di un capitano di mare.</li><li><b>Kreshk</b> (6): mani nude, magia troll, grintosa; capelli a soffione, occhiali, una piuma appesa all’orecchio.</li><li><b>Bniri</b> (4): armi in mano, magia umana, distaccata; vesti da ricca, spada lunga, un bastoncino troll da masticare al collo.</li></ul></details>'+
   '<div class="fld"><label>Impressione di combattimento</label>'+seg('pc_fight',Object.keys(IMP_FIGHT).map(k=>[k,IMP_FIGHT[k]]),'melee')+'</div>'+
@@ -1386,8 +1582,24 @@ function pTbCreate(){
   '<div class="two">'+fld('pc_hair','Capelli',{ph:'crespi a soffione, lisci e neri…'})+fld('pc_horns','Corna',{ph:'corte da capra, coniche e dritte…'})+'</div>'+
   '<div class="two">'+fld('pc_hum','Oggetto umano',{ph:'la lettera di un capitano, un gioiello lavorato…'})+fld('pc_troll','Oggetto troll',{ph:'un sasso fortunato, un bastoncino da masticare…'})+'</div>'+
   '<div class="two">'+fld('pc_cloth','Abiti',{ph:'gilet allacciato, calzoni larghi, scalza…'})+fld('pc_kit','Arma o equipaggiamento',{ph:'due piccole asce da lancio'})+'</div>'+
-  '<div class="fld"><label>Dove sta andando? (a piedi)</label>'+seg('pc_loc',LOCS.map(l=>[l.id,esc(l.name),l.hint]),null,'locs')+'</div>'+
-  btn('Parti','createPC','primary')+'</div>';
+  btn('Avanti: dove va','createPC','primary')+'</div>';
+}
+function travelMap(){
+ if(G.map)return G.map;
+ const w=WORLDS[D.tv_world]?D.tv_world:'fiordi';
+ ui.mapSeed=ui.mapSeed||rid(6);
+ if(!ui.mapDraft||ui.mapDraft.code!==G.code||ui.mapDraft.m.mode!==w||ui.mapDraft.m.seed!==ui.mapSeed)ui.mapDraft={code:G.code,m:newMap(ui.mapSeed,w)};
+ return ui.mapDraft.m;
+}
+function pTravel(){
+ const first=!G.map,m=travelMap(),p=ui.mapPick;
+ return '<div class="form"><h3>Dove va '+esc(pcName(G))+'?</h3>'+
+  (first?'<div class="fld"><label>Che mondo immagini?</label>'+seg('tv_world',Object.keys(WORLDS).map(k=>[k,WORLDS[k].label]),'fiordi','','tvWorld')+'</div>':'')+
+  '<p class="hint">Tocca la mappa nel punto dove vuole andare, a piedi: un luogo con nome oppure un punto qualsiasi sulla terra.'+(first?' La mappa resterà la stessa per tutta la partita.':'')+'</p>'+
+  '<canvas class="mapcv pick" data-map="pick" role="img" aria-label="Mappa del mondo: tocca un punto per scegliere la destinazione"></canvas>'+
+  '<p class="dest">'+(p?'<b>'+esc(p.name)+'</b>'+(p.hint?' — '+esc(p.hint):''):'<span class="muted">Nessuna destinazione scelta.</span>')+'</p>'+
+  '<details class="tips"><summary>Scegli dall’elenco</summary>'+seg('tv_place',m.places.filter(isDest).map(x=>[x.id,esc(x.name),esc(x.hint||'')]),null,'locs','tvPlace')+'</details>'+
+  '<div class="row">'+btn(p?'Parti verso '+esc(p.name):'Parti','travel','primary')+(first?btn('Un’altra mappa','tvReroll','ghost'):'')+'</div></div>';
 }
 function rngText(n){const r=ranges(n);return 'Numero '+n+': Fighting '+rangeText(r.fighting)+' · Magic '+rangeText(r.magic)+' · Social '+rangeText(r.social);}
 function pGmPrep(){
@@ -1398,7 +1610,7 @@ function pGmPrep(){
   fld('gp_where','Dove',{rows:2,ph:'es. monti bassi e tozzi, valli strette, nebbia tra i pini'})+fld('gp_who','Chi c’è',{rows:2,ph:'es. famiglie troll sparse nelle valli; un giovane guerriero umano venuto a uccidere un troll'})+
   fld('gp_stakes','Stakes',{ph:'es. Ree-Shah, ragazza umana cresciuta dai troll, che lo sciamano vuole trasformare in troll'})+
   '<div class="two">'+fld('gp_a','Esito A',{ph:'es. resta con la tribù'})+fld('gp_b','Esito B',{ph:'es. torna tra gli umani'})+'</div>'+
-  fld('gp_chars','Personaggi (uno per riga: Nome — cosa vuole)',{rows:4,ph:'Gallg — vecchio sciamano malato, vuole una troll che lo sostituisca\nOskel — guerriero giovane e spavaldo, vuole il suo primo troll'})+fld('gp_notes','Note segrete',{rows:2})+
+  fld('gp_chars','Personaggi (uno per riga: Nome — cosa vuole)',{rows:4,ph:'Gallg — vecchio sciamano malato, vuole una troll che lo sostituisca\nOskel — guerriero giovane e spavaldo, vuole il suo primo troll'})+'<p class="hint">Nomi umani liberi: '+pickNames(10,G.code+':'+G.adv).join(', ')+'.</p>'+fld('gp_notes','Note segrete',{rows:2})+
   btn('Salva e apri la prima scena','savePrep','primary')+'</div>';
 }
 function pSceneOpen(){
@@ -1533,7 +1745,6 @@ function pInterim(){
   '<div class="fld"><label>Numero di '+esc(pc.name)+' (ora '+pc.number+')</label>'+seg('im_delta',[[-1,'−1'],[0,'Invariato'],[1,'+1']],0)+'</div>'+
   rels.map(r=>'<div class="fld"><label>'+esc(r.name)+' ('+REL_TYPES[r.type].toLowerCase()+')</label>'+seg('im_r_'+r.id,[['keep','Tieni'],['drop','Sciogli']].concat(r.type==='lover'?[]:[['swap',r.type==='ally'?'Rendi avversario':'Rendi alleato']]),'keep')+'</div>').join('')+
   (g.scale<7?'<div class="fld"><label>Scale (ora '+g.scale+': '+SCALES[g.scale-1]+')</label>'+seg('im_scale',[['no','Resta'],['yes','Sale di 1']],'no')+'</div>':'')+
-  '<div class="fld"><label>Dove va ora?</label>'+seg('im_loc',LOCS.map(l=>[l.id,esc(l.name),l.hint]),null,'locs')+'</div>'+
   btn('Si parte','interim','primary')+'</div>';
 }
 
@@ -1597,10 +1808,9 @@ const ACT={
  async askSkip(){await A.ooc('tb','Interpreta tu.',{chat:1});await A.askClose();},
  async createPC(){
   const name=v('pc_name');if(!name)throw 'Dai un nome alla trollbabe.';
-  if(!D.pc_loc)throw 'Scegli dove sta andando.';
   const f=n=>v(n)||'—';
-  await A.createPC({name:name,number:parseInt(D.pc_num,10)||5,magic:D.pc_magic,fight:D.pc_fight,social:D.pc_social,hair:f('pc_hair'),horns:f('pc_horns'),hum:f('pc_hum'),troll:f('pc_troll'),cloth:f('pc_cloth'),kit:f('pc_kit')},parseInt(D.pc_loc,10));
-  clear('pc_name','pc_hair','pc_horns','pc_hum','pc_troll','pc_cloth','pc_kit','pc_loc');
+  await A.createPC({name:name,number:parseInt(D.pc_num,10)||5,magic:D.pc_magic,fight:D.pc_fight,social:D.pc_social,hair:f('pc_hair'),horns:f('pc_horns'),hum:f('pc_hum'),troll:f('pc_troll'),cloth:f('pc_cloth'),kit:f('pc_kit')});
+  clear('pc_name','pc_hair','pc_horns','pc_hum','pc_troll','pc_cloth','pc_kit');
  },
  async genPrep(){
   if(!sample)throw 'L’IA non è disponibile in questa vista.';
@@ -1670,11 +1880,18 @@ const ACT={
   if(!outText)throw 'Dì quale esito degli Stakes avviene.';
   await A.finishEnding(outText,v('en_text'),PRIV);clear('en_text','en_free','en_out');
  },
+ tvWorld(){ui.mapPick=null;bump();},
+ tvReroll(){ui.mapSeed=rid(6);ui.mapPick=null;bump();},
+ tvPlace(sb){ui.mapPick=travelMap().places.find(p=>p.id===sb.dataset.val)||null;bump();},
+ async travel(){
+  const p=ui.mapPick;if(!p)throw 'Tocca la mappa nel punto dove vuole andare.';
+  if(!await A.travel(G.map?null:travelMap(),p))throw 'Partenza non riuscita: riprova.';
+  ui.mapPick=null;ui.mapDraft=null;ui.mapSeed=null;clear('tv_place','tv_world');
+ },
  async interim(){
-  if(!D.im_loc)throw 'Scegli dove va ora.';
   const rels={};G.rels.forEach(r=>{rels[r.id]=D['im_r_'+r.id]||'keep';});
-  await A.interim({delta:parseInt(D.im_delta,10)||0,rels:rels,scaleUp:D.im_scale==='yes',loc:parseInt(D.im_loc,10)});
-  clear('im_delta','im_scale','im_loc');G.rels.forEach(r=>clear('im_r_'+r.id));
+  await A.interim({delta:parseInt(D.im_delta,10)||0,rels:rels,scaleUp:D.im_scale==='yes'});
+  clear('im_delta','im_scale');G.rels.forEach(r=>clear('im_r_'+r.id));
  },
  async exportDiary(){
   let t='# Trollbabe — partita '+G.code+'\n\n';
@@ -1703,6 +1920,13 @@ async function runAct(el){
 function setupEvents(){
  document.addEventListener('input',e=>{const n=e.target&&e.target.dataset&&e.target.dataset.d;if(n)D[n]=e.target.value;});
  document.addEventListener('click',e=>{
+  const mc=e.target.closest('canvas[data-map="pick"]');
+  if(mc&&G&&G.step==='travel'){
+   const r=mc.getBoundingClientRect();if(!r.width)return;
+   const p=placeAt(travelMap(),(e.clientX-r.left)/r.width*MAP_W,(e.clientY-r.top)/r.height*MAP_H);
+   if(!p){toast('Lì c’è il mare: scegli un punto sulla terra.');return;}
+   ui.mapPick=p;D.tv_place=p.id;bump();return;
+  }
   const sb=e.target.closest('.seg button');
   if(sb){
    const s=sb.closest('.seg');D[s.dataset.seg]=sb.dataset.val;
@@ -1754,7 +1978,9 @@ const fresh=seq=>{if(!G||ver()!==seq)throw 'STALE';};
 
 function stateText(role,noSecret){
  const g=G,pc=g.pc,L=[];
- L.push('Scale '+g.scale+' ('+SCALES[g.scale-1]+'). Avventura n. '+g.adv+(g.locName?', luogo: '+g.locName:'')+', scena n. '+g.scene+'.');
+ L.push('Scale '+g.scale+' ('+SCALES[g.scale-1]+'). Avventura n. '+g.adv+(g.locName?', luogo: '+g.locName+(g.locHint?' ('+g.locHint+')':''):'')+', scena n. '+g.scene+'.');
+ const near=g.map?mapNear(g,5):[];
+ if(near.length)L.push('Luoghi vicini sulla mappa: '+near.map(p=>p.name+' ('+p.hint+(p.visited?', già visitato':'')+')').join('; ')+'.');
  if(pc){
   const r=ranges(pc.number);
   L.push('Trollbabe: '+pc.name+', numero '+pc.number+' (Fighting '+rangeText(r.fighting)+', Magic '+rangeText(r.magic)+', Social '+rangeText(r.social)+'). Impressioni: '+IMP_FIGHT[pc.fight]+', '+IMP_MAGIC[pc.magic]+', '+IMP_SOCIAL[pc.social]+'. Capelli: '+pc.hair+'. Corna: '+pc.horns+'. Abiti: '+pc.cloth+'. Equipaggiamento: '+pc.kit+'. Oggetto umano: '+pc.hum+'. Oggetto troll: '+pc.troll+'. Stato: '+STATUS[pc.status]+(pc.hurt?' ('+pc.hurt+')':'')+'.');
@@ -1794,8 +2020,8 @@ function chatText(){
 }
 const askHelp=()=>(G.ask&&G.ask.at===G.logN)?' Hai già chiesto un chiarimento su questa mossa e la risposta è nei CHIARIMENTI: ora rispondi tu, con l’interpretazione più ragionevole; "ask" resta null.':' Se la mossa della giocatrice è davvero ambigua (non è chiaro a chi parla, se tenta un’azione o dichiara solo un’intenzione, se è una domanda a te come GM e non ai PNG, oppure contraddice la fiction stabilita), invece di rispondere puoi farle UNA domanda breve fuori gioco in "ask", lasciando "text" vuoto. Non usarla per dettagli che puoi decidere tu.';
 const TASKS={
- pc_create:()=>'Crea la tua trollbabe. "number" va da 2 a 9: più basso = più brava in magia, più alto = più brava a combattere. Per fight/magic/social usa solo i valori ammessi. "loc" è il numero del luogo verso cui sta camminando: '+LOCS.map(l=>l.id+' '+l.name).join(', ')+'. Per capelli, corna, abiti, equipaggiamento e due oggetti (uno umano, uno troll: personali, non preziosi) scrivi descrizioni brevi e vivide.',
- gm_prep:()=>'Prepara in segreto l’avventura per '+G.locName+' al Scale '+G.scale+' ('+SCALES[G.scale-1]+'). "where": immagini concrete del luogo. "who": chi c’è (umani, troll o entrambi) e cosa fa: nessun luogo è vuoto. "stakes": una persona, luogo o cosa della taglia del Scale che qualcuno vuole e che è in crisi: deve poter cambiare in modo drastico (vita o morte, distruzione o conservazione, diventare altro), non con un semplice cambio di proprietà (NON un obiettivo di trama, NON una missione, NON qualcosa che riguarda la trollbabe). "a" e "b": due esiti concreti e opposti degli Stakes, senza come né perché. Esempio: Stakes «Ree-Shah, ragazza umana cresciuta dai troll, che il vecchio sciamano malato Gallg vuole trasformare in troll, mentre il giovane Oskel è salito sui monti a cacciare il suo primo troll»; esiti «resta con la tribù» / «torna tra gli umani». In "notes" aggiungi anche una breve lista di nomi umani e troll ancora liberi. "characters": 3–5 personaggi con nome e ciò che vogliono, legati tra loro (parentele, rivalità, desideri) in modo da stringere attorno agli Stakes. Il misto umani/troll funziona meglio; ogni tanto un elemento strano che accentui la tensione emotiva degli Stakes. Nei campi di testo scrivi al massimo 60 parole ciascuno.',
+ pc_create:()=>'Crea la tua trollbabe. "number" va da 2 a 9: più basso = più brava in magia, più alto = più brava a combattere. Per fight/magic/social usa solo i valori ammessi. Per capelli, corna, abiti, equipaggiamento e due oggetti (uno umano, uno troll: personali, non preziosi) scrivi descrizioni brevi e vivide. Per il nome scegline uno nordico fra questi o simile: '+pickNames(10,rid(6),'fu').join(', ')+'.',
+ gm_prep:()=>'Prepara in segreto l’avventura per '+G.locName+(G.locHint?' ('+G.locHint+')':'')+' al Scale '+G.scale+' ('+SCALES[G.scale-1]+'). "where": immagini concrete del luogo. "who": chi c’è (umani, troll o entrambi) e cosa fa: nessun luogo è vuoto. "stakes": una persona, luogo o cosa della taglia del Scale che qualcuno vuole e che è in crisi: deve poter cambiare in modo drastico (vita o morte, distruzione o conservazione, diventare altro), non con un semplice cambio di proprietà (NON un obiettivo di trama, NON una missione, NON qualcosa che riguarda la trollbabe). "a" e "b": due esiti concreti e opposti degli Stakes, senza come né perché. Esempio: Stakes «Ree-Shah, ragazza umana cresciuta dai troll, che il vecchio sciamano malato Gallg vuole trasformare in troll, mentre il giovane Oskel è salito sui monti a cacciare il suo primo troll»; esiti «resta con la tribù» / «torna tra gli umani». In "notes" aggiungi anche una breve lista di nomi umani e troll ancora liberi. Per gli umani usa nomi nordici come questi: '+pickNames(12,rid(6)).join(', ')+'. "characters": 3–5 personaggi con nome e ciò che vogliono, legati tra loro (parentele, rivalità, desideri) in modo da stringere attorno agli Stakes. Il misto umani/troll funziona meglio; ogni tanto un elemento strano che accentui la tensione emotiva degli Stakes. Nei campi di testo scrivi al massimo 60 parole ciascuno.',
  scene_open:()=>(G.scene===0?'È la prima scena: la storia si apre con la trollbabe che cammina verso il luogo; mostra il luogo e al massimo una presenza, senza mettere già in scena la posta in gioco. ':'')+'Apri la scena: dì dove siamo, le circostanze immediate e chi c’è. Massimo 50 parole, al più un PNG che agisce o parla, e fermati dove la trollbabe può rispondere. Non aprire con un PNG che le affida un incarico: mostra la situazione e lascia che sia lei a muoversi. '+(G.scene>0?'Rispetta la richiesta di scena della giocatrice, tranne se qualcuno si sta già muovendo per cercarla: in quel caso inizia nel punto dell’interruzione. ':'')+'In "npcs" elenca i nomi dei PNG con nome che introduci. "heal": true solo se la richiesta era una scena di cura e la concedi (se il luogo la rende problematica, concedila comunque: potrai chiamare un conflitto).',
  gm_respond:()=>'È il tuo turno di GM. Una sola mossa, massimo 50 parole, che lasci alla giocatrice il tempo di rispondere (niente eventi a catena, un solo PNG che parla alla volta). Reagisci a ciò che la trollbabe ha appena fatto o detto: descrivi ciò che si vede e le azioni e parole dei PNG (di parte, espliciti su ciò che vogliono). Applica il test dei Conflitti: se a un personaggio non sta bene che l’azione di lei vada come dichiara, o un gesto mette sotto stress il suo rapporto con gli Stakes, o un PNG agisce contro di lei, chiama il conflitto: "conflict" con type e pace (altrimenti null). Se lo chiami, fermati PRIMA dell’esito: descrivi solo l’istante dell’azione e la reazione del PNG, mai il risultato (niente «cade morto», «la scure lo colpisce»). Se la scena è a una pausa naturale o i personaggi hanno cambiato luogo, "end_scene": true. Se gli Stakes hanno raggiunto una condizione finale, "end_adventure": true. Se la trollbabe è incapacitata, chiudi la scena. Se la giocatrice ha deciso di lasciare il luogo, decidi se qualcuno cerca di fermarla (conflict) oppure "end_adventure": true. In "npcs" i nomi dei nuovi PNG con nome.'+askHelp()+objHelp(' In scena vale anche: azioni e parole dei PNG le decidi tu, non la giocatrice.'),
  table_talk:()=>'Sei al tavolo, fuori dal gioco: la giocatrice ti parla da persona a persona (la sua domanda è nelle NOTE), non è la trollbabe che parla ai PNG. Rispondi come GM, in prima persona, senza narrare e senza far parlare i PNG. Chiarisci la fiction già stabilita (età, distanze, chi è presente, cosa si vede o si sente). Se ti fa notare un’incoerenza o un errore, riconoscilo e correggi la fiction in modo esplicito («Hai ragione: …»): la correzione vale da ora in poi. Puoi fissare piccoli dettagli coerenti come faresti al tavolo, ma non rivelare la preparazione segreta (Stakes, esiti, retroscena, segreti dei PNG): se la domanda tocca un segreto, dì che si può scoprire in gioco. Non fare mosse, non far avanzare la scena, non chiamare conflitti. Massimo 60 parole.'+tableTalkMore(),
@@ -1812,7 +2038,8 @@ const TASKS={
  decide_tb:()=>G.conflict.kind==='incap'?'Sei incapacitata (il GM ha narrato). Puoi accettare ("accept": true) oppure giocare l’ultimo roll-again ("accept": false, "item" = id esatto, "text" = come lo usi, max 40 parole) per attenuare la sorte.':'Il terzo roll-again è fallito: resta la narrazione del GM ("die": false) oppure dichiari la morte della trollbabe ("die": true) e la descrivi in "text" (max 40 parole). Scegli la morte solo se è ciò che il personaggio vuole davvero.',
  rel_offer:()=>'Il conflitto è finito. Puoi legarti a un personaggio che era presente (alleato "ally", avversario "opp", amante "lover"). "form": true solo se ha senso per la tua trollbabe. "name": un PNG con nome già in scena oppure un anonimo ("uno dei guerrieri"). "text": come interagisce con lei subito dopo (max 40 parole).',
  ending:()=>'L’avventura finisce ('+(G.endWhy||'')+'). Scegli quale esito degli Stakes avviene ("a" o "b") se non si è risolto in gioco, e scrivi l’epilogo: cosa succede al luogo su scala più grande (max 90 parole), senza nuove scene.',
- interim:()=>'Tra un’avventura e l’altra. "delta": -1, 0 o 1 per il tuo numero. "drop": id delle Relationship che sciogli (lista, anche vuota). "scaleUp": true per far salire il Scale di 1. "loc": numero del luogo dove vai ora: '+LOCS.map(l=>l.id+' '+l.name).join(', ')+'.'
+ interim:()=>'Tra un’avventura e l’altra. "delta": -1, 0 o 1 per il tuo numero. "drop": id delle Relationship che sciogli (lista, anche vuota). "scaleUp": true per far salire il Scale di 1.',
+ travel:()=>'Scegli dove va ora la tua trollbabe, a piedi, tra i luoghi della mappa elencati nelle note. Preferisci un luogo dove non è ancora stata. In "place" metti l’id del luogo.'
 };
 
 // turni successivi del Fair and clear: l’IA rilegge la dichiarazione dell’altro e accetta o aggiorna la propria
@@ -1834,7 +2061,7 @@ async function raiseObjection(why,of,seq){
  await A.ooc('gm',why,{chat:1,objection:1});
  await tx(g=>{g.review=null;g.objection={of:of,why:why};},seq);
 }
-const LIGHT=['review','goal','fair_gm','fair_tb','step_gm','step_tb','rel_offer','interim','tb_request','decide_tb'];
+const LIGHT=['review','goal','fair_gm','fair_tb','step_gm','step_tb','rel_offer','interim','travel','tb_request','decide_tb'];
 const tierFor=t=>(AI.tier==='default'&&LIGHT.indexOf(t)>=0)?'quick':AI.tier;
 async function callAI(role,task,schema,extra,own){
  const ch=role==='gm'?chatText():'';
@@ -1892,9 +2119,9 @@ async function fairJob(s,seq){
 }
 const J={
  pcCreate:{label:'L’IA crea la trollbabe…',async run(seq){
-  const r=await callAI('tb','pc_create','{"name":"…","number":5,"fight":"unarmed|melee|missile","magic":"troll|human","social":"scary|sexy|fun|insightful|feisty|perky|remote|fierce","hair":"…","horns":"…","hum":"…","troll":"…","cloth":"…","kit":"…","loc":4}');
+  const r=await callAI('tb','pc_create','{"name":"…","number":5,"fight":"unarmed|melee|missile","magic":"troll|human","social":"scary|sexy|fun|insightful|feisty|perky|remote|fierce","hair":"…","horns":"…","hum":"…","troll":"…","cloth":"…","kit":"…"}');
   fresh(seq);
-  await A.createPC({name:str(r.name,30)||'Skah',number:intIn(r.number,2,9,5),magic:pickK(r.magic,IMP_MAGIC,'troll'),fight:pickK(r.fight,IMP_FIGHT,'melee'),social:pickK(r.social,IMP_SOCIAL,'fierce'),hair:str(r.hair,60)||'—',horns:str(r.horns,60)||'—',hum:str(r.hum,80)||'—',troll:str(r.troll,80)||'—',cloth:str(r.cloth,80)||'—',kit:str(r.kit,80)||'—'},intIn(r.loc,1,11,1));
+  await A.createPC({name:str(r.name,30)||'Skah',number:intIn(r.number,2,9,5),magic:pickK(r.magic,IMP_MAGIC,'troll'),fight:pickK(r.fight,IMP_FIGHT,'melee'),social:pickK(r.social,IMP_SOCIAL,'fierce'),hair:str(r.hair,60)||'—',horns:str(r.horns,60)||'—',hum:str(r.hum,80)||'—',troll:str(r.troll,80)||'—',cloth:str(r.cloth,80)||'—',kit:str(r.kit,80)||'—'});
  }},
  gmPrep:{label:'L’IA prepara l’avventura (in segreto)…',async run(seq){
   const r=await callAI('gm','gm_prep',PREP_SCHEMA);
@@ -2002,9 +2229,15 @@ const J={
   await A.finishEnding(PRIV&&PRIV[o]?PRIV[o]:(o==='a'?'Esito A':'Esito B'),str(r.text,900),PRIV);
  }},
  interim:{label:'La trollbabe si rimette in cammino…',async run(seq){
-  const r=await callAI('tb','interim','{"delta":0,"drop":[],"scaleUp":false,"loc":4}','Relationship (id = nome): '+(G.rels.filter(x=>!x.dead).map(x=>x.id+' = '+x.name).join('; ')||'nessuna'));fresh(seq);
+  const r=await callAI('tb','interim','{"delta":0,"drop":[],"scaleUp":false}','Relationship (id = nome): '+(G.rels.filter(x=>!x.dead).map(x=>x.id+' = '+x.name).join('; ')||'nessuna'));fresh(seq);
   const rels={};(Array.isArray(r.drop)?r.drop:[]).forEach(id=>{rels[String(id)]='drop';});
-  await A.interim({delta:intIn(r.delta,-1,1,0),rels:rels,scaleUp:!!r.scaleUp,loc:intIn(r.loc,1,11,1)});
+  await A.interim({delta:intIn(r.delta,-1,1,0),rels:rels,scaleUp:!!r.scaleUp});
+ }},
+ travel:{label:'La trollbabe sceglie dove andare…',async run(seq){
+  const m=G.map||newMap(rid(6),Object.keys(WORLDS)[rnd(3)]),dests=m.places.filter(isDest);
+  const r=await callAI('tb','travel','{"place":"p3"}','Luoghi della mappa (id: nome, cosa è): '+dests.map(p=>p.id+': '+p.name+', '+p.hint+(p.visited?' (già visitato)':'')).join('; '));fresh(seq);
+  const p=dests.find(x=>x.id===String(r.place))||dests.find(x=>!x.visited)||dests[0];
+  await A.travel(G.map?null:m,p);
  }}
 };
 function nextAIJob(){
@@ -2021,6 +2254,7 @@ function nextAIJob(){
   case 'rel_approve':return aiSeat('gm')?J.relApprove:null;
   case 'ending':return aiSeat('gm')?J.ending:null;
   case 'interim':return aiSeat('tb')?J.interim:null;
+  case 'travel':return aiSeat('tb')?J.travel:null;
   case 'conflict':
    if(!c)return null;
    switch(c.stage){
@@ -2087,7 +2321,7 @@ async function boot(){
  UID=id||localId();
  showStart();
 }
-if(window.__TB_TEST__){window.__TB={A:A,ACT:ACT,D:D,get G(){return G;},get LOG(){return LOG;},get AI(){return AI;},get PRIV(){return PRIV;},get ROLE(){return ROLE;},ranges:ranges,rollOk:rollOk,relCost:relCost,lastSeries:lastSeries,namedIn:namedIn,stateText:stateText,render:render,expected:expected,availableItems:availableItems,nextAIJob:nextAIJob,aiTick:aiTick,askOpen:askOpen,ui:ui,openGame:openGame,showStart:showStart,TASKS:TASKS};}
+if(window.__TB_TEST__){window.__TB={A:A,ACT:ACT,D:D,get G(){return G;},get LOG(){return LOG;},get AI(){return AI;},get PRIV(){return PRIV;},get ROLE(){return ROLE;},ranges:ranges,rollOk:rollOk,relCost:relCost,lastSeries:lastSeries,namedIn:namedIn,stateText:stateText,render:render,expected:expected,availableItems:availableItems,nextAIJob:nextAIJob,aiTick:aiTick,askOpen:askOpen,ui:ui,openGame:openGame,showStart:showStart,TASKS:TASKS,newMap:newMap,placeAt:placeAt,go(){const m=G.map||newMap('test','fiordi');return A.travel(G.map?null:m,m.places.filter(isDest)[0]);}};}
 boot();
 })();
 

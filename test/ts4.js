@@ -29,7 +29,7 @@ const eq=(a,b,m)=>assert.strictEqual(a,b,m+' (atteso '+b+', trovato '+a+')');
   await sleep(200);
   assert.notStrictEqual(TH.G.step,'ending','una scrittura non verificata non deve essere applicata');
   // il guest legittimo non è stato scalzato
-  await TG.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'},4);
+  await TG.A.createPC({name:'Retta',number:6,magic:'troll',fight:'melee',social:'fun',hair:'x',horns:'x',hum:'x',troll:'x',cloth:'x',kit:'x'});await TG.go();
   await sleep(250);
   eq(TH.G.pc&&TH.G.pc.name,'Retta','il guest legittimo continua a scrivere');
   assert.ok(G.document.querySelector('#t-peer').classList.contains('on'),'presenza del guest ok');
