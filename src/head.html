@@ -164,6 +164,17 @@ summary{font-family:var(--sans);font-size:.88rem;cursor:pointer;color:var(--ink2
 @keyframes rot{to{transform:rotate(360deg)}}
 .lobby .code{font-family:var(--disp);font-size:3rem;letter-spacing:.14em;line-height:1.1}
 .ooc-in{display:flex;gap:.5rem;margin-top:.7rem;padding-top:.5rem;border-top:1px dashed var(--ink2)}
+.e .q{display:none;float:right;min-width:1.7rem;padding:0 .35rem;margin-left:.4rem}
+body.chaton .e .q{display:inline-block}
+.chat-log{display:flex;flex-direction:column;gap:.5rem;margin:.4rem 0}
+.cm{font-family:var(--sans);font-size:.9rem;line-height:1.4;padding:.3rem .55rem;border-left:3px solid var(--ink2)}
+.cm p{margin:.1rem 0 0}
+.cm.me{border-left-color:var(--fjord);margin-left:1rem}
+.cm.gm{border-left-color:var(--ink)}
+.cm.ask{border:2px solid var(--rune);background:var(--rune-t)}
+.cm .re,.re-on{display:block;font-size:.8rem;color:var(--ink2);font-style:italic}
+.re-on{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-top:.5rem}
+.wait.ask{display:block;border:2px solid var(--rune);background:var(--rune-t);padding:.4rem .7rem}
 .ooc-in input{flex:1;background:var(--paper);border:2px solid var(--ink2);padding:.25rem .5rem;border-radius:0;font-family:var(--sans);font-size:.9rem}
 
 /* laterale */
@@ -230,6 +241,7 @@ summary{font-family:var(--sans);font-size:.88rem;cursor:pointer;color:var(--ink2
       <div class="tabs">
         <button type="button" class="on" data-act="tab" data-tab="sheet">Scheda</button>
         <button type="button" data-act="tab" data-tab="rules">Regole</button>
+        <button type="button" class="hidden" data-act="tab" data-tab="chat">Al GM</button>
         <button type="button" data-act="tab" data-tab="more">Altro</button>
       </div>
       <div id="side-body"></div>

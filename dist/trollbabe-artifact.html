@@ -164,6 +164,17 @@ summary{font-family:var(--sans);font-size:.88rem;cursor:pointer;color:var(--ink2
 @keyframes rot{to{transform:rotate(360deg)}}
 .lobby .code{font-family:var(--disp);font-size:3rem;letter-spacing:.14em;line-height:1.1}
 .ooc-in{display:flex;gap:.5rem;margin-top:.7rem;padding-top:.5rem;border-top:1px dashed var(--ink2)}
+.e .q{display:none;float:right;min-width:1.7rem;padding:0 .35rem;margin-left:.4rem}
+body.chaton .e .q{display:inline-block}
+.chat-log{display:flex;flex-direction:column;gap:.5rem;margin:.4rem 0}
+.cm{font-family:var(--sans);font-size:.9rem;line-height:1.4;padding:.3rem .55rem;border-left:3px solid var(--ink2)}
+.cm p{margin:.1rem 0 0}
+.cm.me{border-left-color:var(--fjord);margin-left:1rem}
+.cm.gm{border-left-color:var(--ink)}
+.cm.ask{border:2px solid var(--rune);background:var(--rune-t)}
+.cm .re,.re-on{display:block;font-size:.8rem;color:var(--ink2);font-style:italic}
+.re-on{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-top:.5rem}
+.wait.ask{display:block;border:2px solid var(--rune);background:var(--rune-t);padding:.4rem .7rem}
 .ooc-in input{flex:1;background:var(--paper);border:2px solid var(--ink2);padding:.25rem .5rem;border-radius:0;font-family:var(--sans);font-size:.9rem}
 
 /* laterale */
@@ -230,6 +241,7 @@ summary{font-family:var(--sans);font-size:.88rem;cursor:pointer;color:var(--ink2
       <div class="tabs">
         <button type="button" class="on" data-act="tab" data-tab="sheet">Scheda</button>
         <button type="button" data-act="tab" data-tab="rules">Regole</button>
+        <button type="button" class="hidden" data-act="tab" data-tab="chat">Al GM</button>
         <button type="button" data-act="tab" data-tab="more">Altro</button>
       </div>
       <div id="side-body"></div>
@@ -305,10 +317,13 @@ let UID=null,CODE=null,ROLE=null,G=null,LOG=[],PRIV=null;
 let unsubG=null,unsubL=null,NR=null,PEERS=[];
 const ui={declaring:false,tab:'sheet',rev:0,drawer:false};
 const D={};            // bozze dei campi
-const AI={busy:false,err:null,failedSeq:-1,paused:false,tier:'default',ctl:null,label:''};
+const AI={busy:false,err:null,failedSeq:-1,paused:false,tier:'default',ctl:null,label:'',chatBusy:false,chatErr:null,chatPending:null};
 let busy=false;
 
 const ver=()=>G?G.seq+':'+(G.rev||''):null;
+// domanda di chiarimento del GM ancora aperta sull’ultima mossa (una nuova mossa la supera)
+const askOpen=g=>!!(g&&g.ask&&g.ask.open&&g.ask.at===g.logN);
+const isChat=e=>e.type==='ooc'&&!!(e.meta&&e.meta.chat);
 const gameRef=c=>db.doc('games/'+c);
 const logCol=c=>db.collection('games/'+c+'/log');
 const pcName=g=>(g.pc&&g.pc.name)||'La trollbabe';
@@ -453,12 +468,13 @@ const A={
   if(seat==='gm')addNpcs(g,npcs);
   push(seat,seat,text);g.turn=seat==='gm'?'tb':'gm';
  });},
- async ooc(seat,text){
-  // nota fuori gioco: solo una voce di diario, senza toccare lo stato condiviso
+ async ooc(seat,text,meta){
+  // nota fuori gioco: solo una voce di diario, senza toccare lo stato condiviso (né ver())
   if(!G)return;
   const n=(G.logN||0)+1;
-  await logCol(G.code).doc(String(n).padStart(6,'0')+'-o'+rid(2)).set({type:'ooc',who:seat,text:text,meta:null,n:n,t:Date.now()});
+  await logCol(G.code).doc(String(n).padStart(6,'0')+'-o'+Date.now().toString(36)+rid(2)).set({type:'ooc',who:seat,text:text,meta:meta||null,n:n,t:Date.now()});
  },
+ askClose(){return tx(g=>{if(!askOpen(g))return false;g.ask.open=false;});},
  endScene(){return tx((g,push)=>{if(g.step!=='scene_play')return false;push('sys','','Fine della scena.');g.step='scene_request';});},
  request(text,heal){return tx((g,push)=>{
   g.request={text:text||'',heal:!!heal};
@@ -753,7 +769,7 @@ function openGame(code){
   if(!s.exists){toast('Partita non trovata.');showStart();return;}
   G=s.data();render();settle();aiTick();
  },e=>toast('Errore di sincronizzazione ('+(e&&e.code||'?')+').'));
- unsubL=logCol(code).onSnapshot(q=>{LOG=q.docs.map(d=>Object.assign({_id:d.id},d.data()));renderLog();aiTick();},e=>{});
+ unsubL=logCol(code).onSnapshot(q=>{LOG=q.docs.map(d=>Object.assign({_id:d.id},d.data()));renderLog();render();aiTick();},e=>{});
  secret.get(code).then(p=>{PRIV=p;lastKey='';render();aiTick();});
  joinRoom(code);
  if(net)net.open(code);
@@ -782,18 +798,28 @@ function render(){
  renderTop();
  const fm=['tb_create','gm_prep','interim','lobby'].indexOf(G.step)>=0;
  $('.col').classList.toggle('formmode',fm);
- const sk=ver()+'|'+ui.tab+'|'+(PRIV?1:0)+'|'+AI.tier+'|'+(AI.paused?1:0)+'|'+ROLE;
- if(sk!==lastSideKey){lastSideKey=sk;$('#side-body').innerHTML=sideHTML();$$('#side .tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===ui.tab));}
+ const chatOn=chatAvail(),nChat=LOG.filter(isChat).length;
+ document.body.classList.toggle('chaton',chatOn);
+ $('#side .tabs [data-tab="chat"]').classList.toggle('hidden',!chatOn);
+ if(!chatOn&&ui.tab==='chat')ui.tab='sheet';
+ const sk=ver()+'|'+ui.tab+'|'+(PRIV?1:0)+'|'+AI.tier+'|'+(AI.paused?1:0)+'|'+ROLE+'|'+nChat+'|'+(AI.chatBusy?1:0)+'|'+(AI.chatErr?1:0);
+ if(sk!==lastSideKey){lastSideKey=sk;redraw($('#side-body'),sideHTML());$$('#side .tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===ui.tab));}
  $('#tracker').innerHTML=trackerHTML();
- const k=ver()+'|'+ui.rev+'|'+(AI.busy?1:0)+'|'+(AI.err?1:0)+'|'+(AI.paused?1:0)+'|'+(PRIV?1:0)+'|'+ROLE;
- if(k!==lastKey){
-  lastKey=k;
-  const ae=document.activeElement;const nm=ae&&ae.dataset&&ae.dataset.d;let pos=null;
-  if(nm&&ae.selectionStart!=null)pos=[ae.selectionStart,ae.selectionEnd];
-  $('#dock-body').innerHTML=dockHTML();
-  if(nm){const n=$('[data-d="'+nm+'"]');if(n){n.focus();try{if(pos)n.setSelectionRange(pos[0],pos[1]);}catch(e){}}}
- }
+ const k=ver()+'|'+ui.rev+'|'+(AI.busy?1:0)+'|'+(AI.err?1:0)+'|'+(AI.paused?1:0)+'|'+(PRIV?1:0)+'|'+ROLE+'|'+nChat;
+ if(k!==lastKey){lastKey=k;redraw($('#dock-body'),dockHTML());}
 }
+// ridisegna conservando focus e cursore del campo che si sta scrivendo
+function redraw(el,html){
+ const ae=document.activeElement,nm=ae&&el.contains(ae)&&ae.dataset&&ae.dataset.d;let pos=null;
+ if(nm&&ae.selectionStart!=null)pos=[ae.selectionStart,ae.selectionEnd];
+ el.innerHTML=html;
+ const n=nm&&el.querySelector('[data-d="'+nm+'"]');
+ if(n){n.focus();try{if(pos)n.setSelectionRange(pos[0],pos[1]);}catch(e){}}
+}
+const chatAvail=()=>!!(G&&ROLE==='tb'&&G.seats.gm.kind==='ai'&&G.seats.tb.kind==='human');
+const oocWho=e=>e.who==='gm'?(G.seats.gm.name||'GM'):(G.seats.tb.name||'Giocatrice');
+const cut=t=>t.length>70?t.slice(0,70)+'…':t;
+const qBtn=e=>btn('?','chatRe','sm ghost q','data-id="'+e._id+'" title="Chiedi al GM su questo passaggio" aria-label="Chiedi al GM su questo passaggio"');
 function renderTop(){
  const g=G;
  $('#t-code').textContent=g.code;
@@ -809,11 +835,11 @@ const KIND={fair:'apre il conflitto',success:'successo',incap:'incapacitata',inc
 function entryHTML(e){
  const m=e.meta||{};
  switch(e.type){
-  case 'scene':return '<article class="e scene"><h3>Scena '+(m.scene||'')+' — '+esc(m.loc||'')+'</h3><p>'+nl(e.text)+'</p></article>';
-  case 'gm':return '<article class="e gm"><div class="who">'+esc(whoLabel('gm'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
+  case 'scene':return '<article class="e scene">'+qBtn(e)+'<h3>Scena '+(m.scene||'')+' — '+esc(m.loc||'')+'</h3><p>'+nl(e.text)+'</p></article>';
+  case 'gm':return '<article class="e gm">'+qBtn(e)+'<div class="who">'+esc(whoLabel('gm'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
   case 'tb':return '<article class="e tb"><div class="who">'+esc(whoLabel('tb'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
   case 'sys':if(m.kind==='veto'||m.kind==='rel_ok')return '<div class="e verdict '+(m.kind==='veto'?'veto':'ok')+'"><b>'+(m.kind==='veto'?'Veto del GM':'Relationship accettata')+'</b> '+esc(e.text)+'</div>';return '<div class="e sys">'+esc(e.text)+'</div>';
-  case 'ooc':return '<div class="e ooc"><b>'+esc(e.who==='gm'?(G.seats.gm.name||'GM'):(G.seats.tb.name||'Giocatrice'))+'</b> (fuori gioco): '+esc(e.text)+'</div>';
+  case 'ooc':if(isChat(e))return '';return '<div class="e ooc"><b>'+esc(oocWho(e))+'</b> (fuori gioco): '+esc(e.text)+'</div>';
   case 'roll':return '<div class="e roll '+(m.ok?'win':'lose')+'"><span class="d10">'+m.v+'</span><span>'+(TYPES[m.type]?TYPES[m.type].label:'')+' · numero '+m.n+' · '+(m.ok?'riuscito':'fallito')+(m.ok?'':' · '+BOXES[m.box].f)+'</span></div>';
   case 'conflict':return '<div class="e cflt"><b>Conflict</b> '+(TYPES[m.type]?TYPES[m.type].label:'')+' · '+(PACES[m.pace]?PACES[m.pace].label:'')+'<br>Goal: «'+esc(m.goal)+'»</div>';
  }
@@ -859,6 +885,7 @@ function sideHTML(){
  const g=G;
  if(ui.tab==='rules')return rulesHTML();
  if(ui.tab==='more')return moreHTML();
+ if(ui.tab==='chat')return chatHTML();
  let h='<div class="card slim"><div class="k">Scale</div><b>'+g.scale+' · '+SCALES[g.scale-1]+'</b></div>';
  const pc=g.pc;
  if(pc){
@@ -891,6 +918,21 @@ function rulesHTML(){
  '<h4>Relationship</h4><p>Si stringono dopo un conflitto con un personaggio presente, più un’interazione. Per i PNG con nome decide il GM. Usarle come roll-again le mette a rischio.</p>'+
  '<h4>Scale</h4><p>Limita ciò che la trollbabe riesce a compiere di persona. Sale di 1 tra un’avventura e l’altra, mai scende.</p></div>';
 }
+function chatHTML(){
+ const find=id=>id&&LOG.find(x=>x._id===id);
+ const rows=LOG.filter(isChat).map(e=>{
+  const q=find(e.meta.re);
+  return '<div class="cm '+(e.who==='gm'?'gm':'me')+(e.meta.ask?' ask':'')+'"><b>'+(e.who==='gm'?(e.meta.ask?'Il GM chiede':'GM'):'Tu')+'</b>'+(q?'<span class="re">su «'+esc(cut(q.text))+'»</span>':'')+'<p>'+nl(e.text)+'</p></div>';
+ }).join('');
+ const q=find(D.chat_re),open=askOpen(G);
+ return '<div class="card slim chat"><div class="k">Al tavolo, fuori gioco</div><p class="hint">Domande, chiarimenti e correzioni al GM: non sono mosse di gioco. Anche il GM può chiederti di chiarire una tua mossa.</p>'+
+  '<div class="chat-log">'+(rows||'<p class="muted">Ancora nessuno scambio.</p>')+'</div>'+
+  (AI.chatBusy?'<div class="wait ai"><span class="spin"></span><span>Il GM risponde…</span></div>':'')+
+  (AI.chatErr?'<div class="wait err"><p>'+esc(AI.chatErr)+'</p><div class="row">'+btn('Riprova','chatRetry','primary sm')+'</div></div>':'')+
+  (open?'<div class="row">'+btn('Interpreta tu','askSkip','sm ghost')+'</div>':'')+
+  (q?'<div class="re-on"><span>Su «'+esc(cut(q.text))+'»</span>'+btn('×','chatReClear','sm ghost','aria-label="Togli la citazione"')+'</div>':'')+
+  '<div class="ooc-in"><input data-d="chat" type="text" placeholder="'+(open?'Rispondi al GM…':'Chiedi al GM…')+'" value="'+esc(D.chat||'')+'">'+btn('Invia','chatSend','sm')+'</div></div>';
+}
 function moreHTML(){
  return '<div class="card slim"><div class="k">IA</div>'+(sample?'<p class="hint">'+(sample.setKey?'Ogni risposta dell’IA è a carico della tua chiave Anthropic.':'Ogni risposta dell’IA usa il tuo utilizzo di Claude.')+'</p>'+seg('ai_tier',[['quick','Veloce'],['default','Equilibrata'],['complex','Profonda']],AI.tier,'',"aiTier")+
   '<div class="row">'+btn(AI.paused?'Riprendi l’IA':'Metti l’IA in pausa','aiToggle','sm')+(sample.setKey?btn(sample.hasKey()?'Cambia la chiave API':'Imposta la chiave API','setKey','sm'):'')+'</div>':'<p class="muted">L’IA non è disponibile in questa vista.</p>')+'</div>'+
@@ -903,6 +945,10 @@ function waitHTML(exp){
  const aiSeats=(exp||[]).filter(s=>g.seats[s].kind==='ai');
  if(aiSeats.length&&isDriver()){
   if(!sample)return '<div class="wait err"><p>L’IA non è disponibile in questa vista: aprila dentro Claude e consenti l’uso di Claude.</p></div>';
+  if(askOpen(g)&&aiSeats.indexOf('gm')>=0){
+   const q=LOG.filter(e=>isChat(e)&&e.meta.ask).pop();
+   return '<div class="wait ask"><p><b>Il GM ti chiede un chiarimento</b>'+(q?': «'+esc(q.text)+'»':'.')+'</p><div class="row">'+btn('Rispondi','chatOpen','primary sm')+btn('Interpreta tu','askSkip','sm ghost')+'</div></div>';
+  }
   if(AI.err)return '<div class="wait err"><p>'+esc(AI.err)+'</p><div class="row">'+btn('Riprova','aiRetry','primary sm')+btn('Pausa','aiToggle','sm')+'</div></div>';
   if(AI.paused)return '<div class="wait"><p>L’IA è in pausa.</p><div class="row">'+btn('Riprendi','aiToggle','primary sm')+'</div></div>';
   return '<div class="wait ai"><span class="spin"></span><span>'+esc(AI.label||'L’IA sta pensando…')+'</span>'+btn('Ferma','aiStop','sm ghost')+'</div>';
@@ -1123,6 +1169,21 @@ const ACT={
  numPrev(){const n=parseInt(D.pc_num,10)||5;const e=$('#rngPrev');if(e)e.textContent=rngText(n)+'. Più basso = più magia, più alto = più combattimento.';},
  paceDesc(){},
  async ooc(){const t=v('ooc');if(!t)return;await A.ooc(ROLE,t);clear('ooc');},
+ async chatSend(){
+  const t=v('chat');if(!t||AI.chatBusy)return;
+  const re=D.chat_re||null,reply=askOpen(G);
+  clear('chat','chat_re');
+  await A.ooc('tb',t,re?{chat:1,re:re}:{chat:1});
+  if(reply){await A.askClose();return;}
+  if(!sample){toast('L’IA non è disponibile in questa vista.');return;}
+  // senza await: runAct terrebbe bloccati i pulsanti di gioco finché il GM risponde
+  answerChat(t,re);
+ },
+ chatRetry(){const p=AI.chatPending;if(p)answerChat(p.text,p.re);},
+ chatOpen(){ui.tab='chat';document.body.classList.add('drawer');lastSideKey='';render();const n=$('[data-d="chat"]');if(n)n.focus();},
+ chatRe(el){D.chat_re=el.dataset.id;ACT.chatOpen();},
+ chatReClear(){clear('chat_re');lastSideKey='';render();},
+ async askSkip(){await A.ooc('tb','Interpreta tu.',{chat:1});await A.askClose();},
  async createPC(){
   const name=v('pc_name');if(!name)throw 'Dai un nome alla trollbabe.';
   if(!D.pc_loc)throw 'Scegli dove sta andando.';
@@ -1210,6 +1271,7 @@ const ACT={
    else if(e.type==='gm'||e.type==='tb')t+='**'+whoLabel(e.type)+':** '+e.text+'\n\n';
    else if(e.type==='sys')t+='_'+e.text+'_\n\n';
    else if(e.type==='roll')t+='> d10 = '+m.v+' ('+TYPES[m.type].label+', numero '+m.n+'): '+(m.ok?'riuscito':'fallito')+'\n\n';
+   else if(e.type==='ooc')t+='> _Fuori gioco_ · **'+oocWho(e)+':** '+e.text.replace(/\n/g,'\n> ')+'\n\n';
    else if(e.type==='conflict')t+='> **Conflict** '+TYPES[m.type].label+' · '+PACES[m.pace].label+' · Goal: «'+m.goal+'»\n\n';
   });
   if(!downloads){toast('Il salvataggio non è disponibile in questa vista.');return;}
@@ -1238,6 +1300,7 @@ function setupEvents(){
   const a=e.target.closest('[data-act]');if(a)runAct(a);
  });
  document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target&&e.target.tagName==='INPUT'&&e.target.closest('.ooc-in')){e.preventDefault();const b=e.target.closest('.ooc-in').querySelector('[data-act]');if(b)b.click();return;}
   if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)&&e.target&&e.target.tagName==='TEXTAREA'){
    const p=$('#dock [data-primary]');if(p)p.click();
   }
@@ -1302,16 +1365,22 @@ function logText(){
   if(e.type==='sys')return '['+e.text+']';
   if(e.type==='roll')return '[d10='+m.v+' '+TYPES[m.type].label+' numero '+m.n+' → '+(m.ok?'riuscito':'fallito')+']';
   if(e.type==='conflict')return '[CONFLICT '+TYPES[m.type].label+', Pace '+m.pace+', Goal: '+m.goal+']';
-  if(e.type==='ooc'&&e.who==='tb')return '[nota fuori gioco della giocatrice: '+e.text+']';
+  if(e.type==='ooc'&&e.who==='tb'&&!isChat(e))return '[nota fuori gioco della giocatrice: '+e.text+']';
   return '';
  }).filter(Boolean).map(s=>s.length>700?s.slice(0,700)+'…':s);
  return rows.join('\n')||'(ancora niente)';
 }
+function chatText(){
+ const rows=LOG.filter(isChat).slice(-8).map(e=>(e.who==='gm'?'GM':'Giocatrice')+': '+e.text);
+ return rows.length?rows.join('\n'):'';
+}
+const askHelp=()=>(G.ask&&G.ask.at===G.logN)?' Hai già chiesto un chiarimento su questa mossa e la risposta è nei CHIARIMENTI: ora rispondi tu, con l’interpretazione più ragionevole; "ask" resta null.':' Se la mossa della giocatrice è davvero ambigua (non è chiaro a chi parla, se tenta un’azione o dichiara solo un’intenzione, se è una domanda a te come GM e non ai PNG, oppure contraddice la fiction stabilita), invece di rispondere puoi farle UNA domanda breve fuori gioco in "ask", lasciando "text" vuoto. Non usarla per dettagli che puoi decidere tu.';
 const TASKS={
  pc_create:()=>'Crea la tua trollbabe. "number" va da 2 a 9: più basso = più brava in magia, più alto = più brava a combattere. Per fight/magic/social usa solo i valori ammessi. "loc" è il numero del luogo verso cui sta camminando: '+LOCS.map(l=>l.id+' '+l.name).join(', ')+'. Per capelli, corna, abiti, equipaggiamento e due oggetti (uno umano, uno troll: personali, non preziosi) scrivi descrizioni brevi e vivide.',
  gm_prep:()=>'Prepara in segreto l’avventura per '+G.locName+' al Scale '+G.scale+' ('+SCALES[G.scale-1]+'). "where": immagini concrete del luogo. "who": chi c’è (umani, troll o entrambi) e cosa fa: nessun luogo è vuoto. "stakes": una persona, luogo o cosa della taglia del Scale che qualcuno vuole (NON un obiettivo di trama, NON qualcosa che riguarda la trollbabe). "a" e "b": due esiti concreti e opposti degli Stakes, senza come né perché. "characters": 3–5 personaggi con nome e ciò che vogliono, legati tra loro (parentele, rivalità, desideri) in modo da stringere attorno agli Stakes. Il misto umani/troll funziona meglio; ogni tanto un elemento strano che accentui la tensione emotiva degli Stakes. Nei campi di testo scrivi al massimo 60 parole ciascuno.',
  scene_open:()=>(G.scene===0?'È la prima scena: la storia si apre con la trollbabe che cammina verso il luogo; mostra il luogo e al massimo una presenza, senza mettere già in scena la posta in gioco. ':'')+'Apri la scena: dì dove siamo, le circostanze immediate e chi c’è. Massimo 50 parole, al più un PNG che agisce o parla, e fermati dove la trollbabe può rispondere. '+(G.scene>0?'Rispetta la richiesta di scena della giocatrice, tranne se qualcuno si sta già muovendo per cercarla: in quel caso inizia nel punto dell’interruzione. ':'')+'In "npcs" elenca i nomi dei PNG con nome che introduci. "heal": true solo se la richiesta era una scena di cura e la concedi (se il luogo la rende problematica, concedila comunque: potrai chiamare un conflitto).',
- gm_respond:()=>'È il tuo turno di GM. Una sola mossa, massimo 50 parole, che lasci alla giocatrice il tempo di rispondere (niente eventi a catena, un solo PNG che parla alla volta). Reagisci a ciò che la trollbabe ha appena fatto o detto: descrivi ciò che si vede e le azioni e parole dei PNG (di parte, espliciti su ciò che vogliono). Applica il test dei Conflitti: se a un personaggio non sta bene che l’azione di lei vada come dichiara, o un gesto mette sotto stress il suo rapporto con gli Stakes, o un PNG agisce contro di lei, chiama il conflitto: "conflict" con type e pace (altrimenti null). Se lo chiami, fermati PRIMA dell’esito: descrivi solo l’istante dell’azione e la reazione del PNG, mai il risultato (niente «cade morto», «la scure lo colpisce»). Se la scena è a una pausa naturale o i personaggi hanno cambiato luogo, "end_scene": true. Se gli Stakes hanno raggiunto una condizione finale, "end_adventure": true. Se la trollbabe è incapacitata, chiudi la scena. Se la giocatrice ha deciso di lasciare il luogo, decidi se qualcuno cerca di fermarla (conflict) oppure "end_adventure": true. In "npcs" i nomi dei nuovi PNG con nome.',
+ gm_respond:()=>'È il tuo turno di GM. Una sola mossa, massimo 50 parole, che lasci alla giocatrice il tempo di rispondere (niente eventi a catena, un solo PNG che parla alla volta). Reagisci a ciò che la trollbabe ha appena fatto o detto: descrivi ciò che si vede e le azioni e parole dei PNG (di parte, espliciti su ciò che vogliono). Applica il test dei Conflitti: se a un personaggio non sta bene che l’azione di lei vada come dichiara, o un gesto mette sotto stress il suo rapporto con gli Stakes, o un PNG agisce contro di lei, chiama il conflitto: "conflict" con type e pace (altrimenti null). Se lo chiami, fermati PRIMA dell’esito: descrivi solo l’istante dell’azione e la reazione del PNG, mai il risultato (niente «cade morto», «la scure lo colpisce»). Se la scena è a una pausa naturale o i personaggi hanno cambiato luogo, "end_scene": true. Se gli Stakes hanno raggiunto una condizione finale, "end_adventure": true. Se la trollbabe è incapacitata, chiudi la scena. Se la giocatrice ha deciso di lasciare il luogo, decidi se qualcuno cerca di fermarla (conflict) oppure "end_adventure": true. In "npcs" i nomi dei nuovi PNG con nome.'+askHelp(),
+ table_talk:()=>'Sei al tavolo, fuori dal gioco: la giocatrice ti parla da persona a persona (la sua domanda è nelle NOTE), non è la trollbabe che parla ai PNG. Rispondi come GM, in prima persona, senza narrare e senza far parlare i PNG. Chiarisci la fiction già stabilita (età, distanze, chi è presente, cosa si vede o si sente). Se ti fa notare un’incoerenza o un errore, riconoscilo e correggi la fiction in modo esplicito («Hai ragione: …»): la correzione vale da ora in poi. Puoi fissare piccoli dettagli coerenti come faresti al tavolo, ma non rivelare la preparazione segreta (Stakes, esiti, retroscena, segreti dei PNG): se la domanda tocca un segreto, dì che si può scoprire in gioco. Non fare mosse, non far avanzare la scena, non chiamare conflitti. Massimo 60 parole.',
  tb_act:()=>'È il tuo turno: dì o fai qualcosa di coerente con chi è la tua trollbabe e con ciò che sta succedendo. Se vuoi un conflitto (cioè agisci per ottenere qualcosa da qualcuno o contro qualcuno), compila "conflict" con type, pace e goal (null altrimenti). "leave": true solo se vuoi davvero lasciare il luogo. "ask_end": true se la scena ti sembra conclusa.',
  tb_request:()=>'La scena è finita. Dì dove vuoi andare o cosa vuoi fare nella prossima scena (una frase). "heal": true se sei ferita o incapacitata e vuoi che sia una scena di cura.',
  goal:()=>'Il GM ha dichiarato un conflitto '+TYPES[G.conflict.type].label+'. Dichiara il tuo Goal: un risultato attivo che coinvolge qualcun altro o qualcosa, detto in generale, non passivo e non troppo specifico.',
@@ -1327,11 +1396,23 @@ const TASKS={
 
 const LIGHT=['goal','fair_gm','fair_tb','rel_offer','interim','tb_request','decide_tb'];
 const tierFor=t=>(AI.tier==='default'&&LIGHT.indexOf(t)>=0)?'quick':AI.tier;
-async function callAI(role,task,schema,extra){
- const prompt=[role==='gm'?GM_RULES:TB_RULES,'=== STATO ===\n'+stateText(role,task==='gm_prep'),'=== DIARIO RECENTE ===\n'+logText(),extra?'=== NOTE ===\n'+extra:'','=== COMPITO ['+task+'] ===\n'+TASKS[task](),'Rispondi SOLO con un oggetto JSON, senza altro testo, di questa forma:\n'+schema].filter(Boolean).join('\n\n');
- AI.ctl=new AbortController();
- try{return await sample.json(prompt,{modelTier:tierFor(task),signal:AI.ctl.signal,cache:false});}
- finally{AI.ctl=null;}
+async function callAI(role,task,schema,extra,own){
+ const ch=role==='gm'?chatText():'';
+ const prompt=[role==='gm'?GM_RULES:TB_RULES,'=== STATO ===\n'+stateText(role,task==='gm_prep'),'=== DIARIO RECENTE ===\n'+logText(),ch?'=== CHIARIMENTI FUORI GIOCO (accordi sulla fiction: valgono) ===\n'+ch:'',extra?'=== NOTE ===\n'+extra:'','=== COMPITO ['+task+'] ===\n'+TASKS[task](),'Rispondi SOLO con un oggetto JSON, senza altro testo, di questa forma:\n'+schema].filter(Boolean).join('\n\n');
+ // la chat ha un proprio controller: «Ferma» e la pausa riguardano solo il gioco
+ const ctl=new AbortController();if(!own)AI.ctl=ctl;
+ try{return await sample.json(prompt,{modelTier:tierFor(task),signal:ctl.signal,cache:false});}
+ finally{if(!own)AI.ctl=null;}
+}
+async function answerChat(text,re){
+ const q=re&&LOG.find(e=>e._id===re);
+ AI.chatBusy=true;AI.chatErr=null;AI.chatPending=null;render();
+ try{
+  const r=await callAI('gm','table_talk','{"text":"…"}','Domanda della giocatrice: «'+text+'»'+(q?'\nSi riferisce a questo passaggio: «'+q.text+'»':''),true);
+  const t=str(r.text,900);if(!t)throw {code:'empty_completion'};
+  await A.ooc('gm',t,{chat:1});
+ }catch(e){AI.chatErr=aiErrText(e);AI.chatPending={text:text,re:re};console.error(e);}
+ finally{AI.chatBusy=false;render();}
 }
 function aiErrText(e){
  const c=e&&e.code;
@@ -1373,8 +1454,14 @@ const J={
   await A.openScene(t,Array.isArray(r.npcs)?r.npcs:[],!!r.heal);
  }},
  gmRespond:{label:'Il GM sta rispondendo…',async run(seq){
-  const r=await callAI('gm','gm_respond','{"text":"…","npcs":["…"],"conflict":null,"end_scene":false,"end_adventure":false}\nSe chiami un conflitto: "conflict":{"type":"fighting|magic|social","pace":2}');
+  const r=await callAI('gm','gm_respond','{"text":"…","npcs":["…"],"conflict":null,"end_scene":false,"end_adventure":false,"ask":null}\nSe chiami un conflitto: "conflict":{"type":"fighting|magic|social","pace":2}');
   fresh(seq);
+  const q=str(r.ask,400);
+  if(q&&!(G.ask&&G.ask.at===G.logN)){
+   await A.ooc('gm',q,{chat:1,ask:1});
+   await tx(g=>{if(g.step!=='scene_play')return false;g.ask={open:true,at:g.logN};},seq);
+   return;
+  }
   const t=str(r.text,1400);if(!t)throw {code:'empty_completion'};
   const ct=r.conflict&&pickK(r.conflict.type,TYPES,null);
   await tx((g,push)=>{
@@ -1461,7 +1548,7 @@ function nextAIJob(){
   case 'tb_create':return aiSeat('tb')?J.pcCreate:null;
   case 'gm_prep':return aiSeat('gm')?J.gmPrep:null;
   case 'scene_open':return aiSeat('gm')?J.sceneOpen:null;
-  case 'scene_play':if(aiSeat('gm')&&((g.turn||'tb')==='gm'||g.pc.status==='incap'))return J.gmRespond;if((g.turn||'tb')==='tb'&&aiSeat('tb')&&g.pc.status!=='incap')return J.tbAct;return null;
+  case 'scene_play':if(askOpen(g))return null;if(aiSeat('gm')&&((g.turn||'tb')==='gm'||g.pc.status==='incap'))return J.gmRespond;if((g.turn||'tb')==='tb'&&aiSeat('tb')&&g.pc.status!=='incap')return J.tbAct;return null;
   case 'scene_request':return aiSeat('tb')?J.tbRequest:null;
   case 'rel_offer':return aiSeat('tb')?J.relOffer:null;
   case 'rel_approve':return aiSeat('gm')?J.relApprove:null;
@@ -1541,7 +1628,7 @@ async function boot(){
  UID=id||localId();
  showStart();
 }
-if(window.__TB_TEST__){window.__TB={A:A,ACT:ACT,D:D,get G(){return G;},get LOG(){return LOG;},get AI(){return AI;},get PRIV(){return PRIV;},get ROLE(){return ROLE;},ranges:ranges,rollOk:rollOk,relCost:relCost,expected:expected,availableItems:availableItems,nextAIJob:nextAIJob,aiTick:aiTick,ui:ui,openGame:openGame,showStart:showStart,TASKS:TASKS};}
+if(window.__TB_TEST__){window.__TB={A:A,ACT:ACT,D:D,get G(){return G;},get LOG(){return LOG;},get AI(){return AI;},get PRIV(){return PRIV;},get ROLE(){return ROLE;},ranges:ranges,rollOk:rollOk,relCost:relCost,expected:expected,availableItems:availableItems,nextAIJob:nextAIJob,aiTick:aiTick,askOpen:askOpen,ui:ui,openGame:openGame,showStart:showStart,TASKS:TASKS};}
 boot();
 })();
 

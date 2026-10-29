@@ -65,10 +65,13 @@ let UID=null,CODE=null,ROLE=null,G=null,LOG=[],PRIV=null;
 let unsubG=null,unsubL=null,NR=null,PEERS=[];
 const ui={declaring:false,tab:'sheet',rev:0,drawer:false};
 const D={};            // bozze dei campi
-const AI={busy:false,err:null,failedSeq:-1,paused:false,tier:'default',ctl:null,label:''};
+const AI={busy:false,err:null,failedSeq:-1,paused:false,tier:'default',ctl:null,label:'',chatBusy:false,chatErr:null,chatPending:null};
 let busy=false;
 
 const ver=()=>G?G.seq+':'+(G.rev||''):null;
+// domanda di chiarimento del GM ancora aperta sull’ultima mossa (una nuova mossa la supera)
+const askOpen=g=>!!(g&&g.ask&&g.ask.open&&g.ask.at===g.logN);
+const isChat=e=>e.type==='ooc'&&!!(e.meta&&e.meta.chat);
 const gameRef=c=>db.doc('games/'+c);
 const logCol=c=>db.collection('games/'+c+'/log');
 const pcName=g=>(g.pc&&g.pc.name)||'La trollbabe';
@@ -213,12 +216,13 @@ const A={
   if(seat==='gm')addNpcs(g,npcs);
   push(seat,seat,text);g.turn=seat==='gm'?'tb':'gm';
  });},
- async ooc(seat,text){
-  // nota fuori gioco: solo una voce di diario, senza toccare lo stato condiviso
+ async ooc(seat,text,meta){
+  // nota fuori gioco: solo una voce di diario, senza toccare lo stato condiviso (né ver())
   if(!G)return;
   const n=(G.logN||0)+1;
-  await logCol(G.code).doc(String(n).padStart(6,'0')+'-o'+rid(2)).set({type:'ooc',who:seat,text:text,meta:null,n:n,t:Date.now()});
+  await logCol(G.code).doc(String(n).padStart(6,'0')+'-o'+Date.now().toString(36)+rid(2)).set({type:'ooc',who:seat,text:text,meta:meta||null,n:n,t:Date.now()});
  },
+ askClose(){return tx(g=>{if(!askOpen(g))return false;g.ask.open=false;});},
  endScene(){return tx((g,push)=>{if(g.step!=='scene_play')return false;push('sys','','Fine della scena.');g.step='scene_request';});},
  request(text,heal){return tx((g,push)=>{
   g.request={text:text||'',heal:!!heal};

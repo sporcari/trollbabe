@@ -137,7 +137,7 @@ function openGame(code){
   if(!s.exists){toast('Partita non trovata.');showStart();return;}
   G=s.data();render();settle();aiTick();
  },e=>toast('Errore di sincronizzazione ('+(e&&e.code||'?')+').'));
- unsubL=logCol(code).onSnapshot(q=>{LOG=q.docs.map(d=>Object.assign({_id:d.id},d.data()));renderLog();aiTick();},e=>{});
+ unsubL=logCol(code).onSnapshot(q=>{LOG=q.docs.map(d=>Object.assign({_id:d.id},d.data()));renderLog();render();aiTick();},e=>{});
  secret.get(code).then(p=>{PRIV=p;lastKey='';render();aiTick();});
  joinRoom(code);
  if(net)net.open(code);
@@ -166,18 +166,28 @@ function render(){
  renderTop();
  const fm=['tb_create','gm_prep','interim','lobby'].indexOf(G.step)>=0;
  $('.col').classList.toggle('formmode',fm);
- const sk=ver()+'|'+ui.tab+'|'+(PRIV?1:0)+'|'+AI.tier+'|'+(AI.paused?1:0)+'|'+ROLE;
- if(sk!==lastSideKey){lastSideKey=sk;$('#side-body').innerHTML=sideHTML();$$('#side .tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===ui.tab));}
+ const chatOn=chatAvail(),nChat=LOG.filter(isChat).length;
+ document.body.classList.toggle('chaton',chatOn);
+ $('#side .tabs [data-tab="chat"]').classList.toggle('hidden',!chatOn);
+ if(!chatOn&&ui.tab==='chat')ui.tab='sheet';
+ const sk=ver()+'|'+ui.tab+'|'+(PRIV?1:0)+'|'+AI.tier+'|'+(AI.paused?1:0)+'|'+ROLE+'|'+nChat+'|'+(AI.chatBusy?1:0)+'|'+(AI.chatErr?1:0);
+ if(sk!==lastSideKey){lastSideKey=sk;redraw($('#side-body'),sideHTML());$$('#side .tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===ui.tab));}
  $('#tracker').innerHTML=trackerHTML();
- const k=ver()+'|'+ui.rev+'|'+(AI.busy?1:0)+'|'+(AI.err?1:0)+'|'+(AI.paused?1:0)+'|'+(PRIV?1:0)+'|'+ROLE;
- if(k!==lastKey){
-  lastKey=k;
-  const ae=document.activeElement;const nm=ae&&ae.dataset&&ae.dataset.d;let pos=null;
-  if(nm&&ae.selectionStart!=null)pos=[ae.selectionStart,ae.selectionEnd];
-  $('#dock-body').innerHTML=dockHTML();
-  if(nm){const n=$('[data-d="'+nm+'"]');if(n){n.focus();try{if(pos)n.setSelectionRange(pos[0],pos[1]);}catch(e){}}}
- }
+ const k=ver()+'|'+ui.rev+'|'+(AI.busy?1:0)+'|'+(AI.err?1:0)+'|'+(AI.paused?1:0)+'|'+(PRIV?1:0)+'|'+ROLE+'|'+nChat;
+ if(k!==lastKey){lastKey=k;redraw($('#dock-body'),dockHTML());}
 }
+// ridisegna conservando focus e cursore del campo che si sta scrivendo
+function redraw(el,html){
+ const ae=document.activeElement,nm=ae&&el.contains(ae)&&ae.dataset&&ae.dataset.d;let pos=null;
+ if(nm&&ae.selectionStart!=null)pos=[ae.selectionStart,ae.selectionEnd];
+ el.innerHTML=html;
+ const n=nm&&el.querySelector('[data-d="'+nm+'"]');
+ if(n){n.focus();try{if(pos)n.setSelectionRange(pos[0],pos[1]);}catch(e){}}
+}
+const chatAvail=()=>!!(G&&ROLE==='tb'&&G.seats.gm.kind==='ai'&&G.seats.tb.kind==='human');
+const oocWho=e=>e.who==='gm'?(G.seats.gm.name||'GM'):(G.seats.tb.name||'Giocatrice');
+const cut=t=>t.length>70?t.slice(0,70)+'…':t;
+const qBtn=e=>btn('?','chatRe','sm ghost q','data-id="'+e._id+'" title="Chiedi al GM su questo passaggio" aria-label="Chiedi al GM su questo passaggio"');
 function renderTop(){
  const g=G;
  $('#t-code').textContent=g.code;
@@ -193,11 +203,11 @@ const KIND={fair:'apre il conflitto',success:'successo',incap:'incapacitata',inc
 function entryHTML(e){
  const m=e.meta||{};
  switch(e.type){
-  case 'scene':return '<article class="e scene"><h3>Scena '+(m.scene||'')+' — '+esc(m.loc||'')+'</h3><p>'+nl(e.text)+'</p></article>';
-  case 'gm':return '<article class="e gm"><div class="who">'+esc(whoLabel('gm'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
+  case 'scene':return '<article class="e scene">'+qBtn(e)+'<h3>Scena '+(m.scene||'')+' — '+esc(m.loc||'')+'</h3><p>'+nl(e.text)+'</p></article>';
+  case 'gm':return '<article class="e gm">'+qBtn(e)+'<div class="who">'+esc(whoLabel('gm'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
   case 'tb':return '<article class="e tb"><div class="who">'+esc(whoLabel('tb'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
   case 'sys':if(m.kind==='veto'||m.kind==='rel_ok')return '<div class="e verdict '+(m.kind==='veto'?'veto':'ok')+'"><b>'+(m.kind==='veto'?'Veto del GM':'Relationship accettata')+'</b> '+esc(e.text)+'</div>';return '<div class="e sys">'+esc(e.text)+'</div>';
-  case 'ooc':return '<div class="e ooc"><b>'+esc(e.who==='gm'?(G.seats.gm.name||'GM'):(G.seats.tb.name||'Giocatrice'))+'</b> (fuori gioco): '+esc(e.text)+'</div>';
+  case 'ooc':if(isChat(e))return '';return '<div class="e ooc"><b>'+esc(oocWho(e))+'</b> (fuori gioco): '+esc(e.text)+'</div>';
   case 'roll':return '<div class="e roll '+(m.ok?'win':'lose')+'"><span class="d10">'+m.v+'</span><span>'+(TYPES[m.type]?TYPES[m.type].label:'')+' · numero '+m.n+' · '+(m.ok?'riuscito':'fallito')+(m.ok?'':' · '+BOXES[m.box].f)+'</span></div>';
   case 'conflict':return '<div class="e cflt"><b>Conflict</b> '+(TYPES[m.type]?TYPES[m.type].label:'')+' · '+(PACES[m.pace]?PACES[m.pace].label:'')+'<br>Goal: «'+esc(m.goal)+'»</div>';
  }
@@ -243,6 +253,7 @@ function sideHTML(){
  const g=G;
  if(ui.tab==='rules')return rulesHTML();
  if(ui.tab==='more')return moreHTML();
+ if(ui.tab==='chat')return chatHTML();
  let h='<div class="card slim"><div class="k">Scale</div><b>'+g.scale+' · '+SCALES[g.scale-1]+'</b></div>';
  const pc=g.pc;
  if(pc){
@@ -275,6 +286,21 @@ function rulesHTML(){
  '<h4>Relationship</h4><p>Si stringono dopo un conflitto con un personaggio presente, più un’interazione. Per i PNG con nome decide il GM. Usarle come roll-again le mette a rischio.</p>'+
  '<h4>Scale</h4><p>Limita ciò che la trollbabe riesce a compiere di persona. Sale di 1 tra un’avventura e l’altra, mai scende.</p></div>';
 }
+function chatHTML(){
+ const find=id=>id&&LOG.find(x=>x._id===id);
+ const rows=LOG.filter(isChat).map(e=>{
+  const q=find(e.meta.re);
+  return '<div class="cm '+(e.who==='gm'?'gm':'me')+(e.meta.ask?' ask':'')+'"><b>'+(e.who==='gm'?(e.meta.ask?'Il GM chiede':'GM'):'Tu')+'</b>'+(q?'<span class="re">su «'+esc(cut(q.text))+'»</span>':'')+'<p>'+nl(e.text)+'</p></div>';
+ }).join('');
+ const q=find(D.chat_re),open=askOpen(G);
+ return '<div class="card slim chat"><div class="k">Al tavolo, fuori gioco</div><p class="hint">Domande, chiarimenti e correzioni al GM: non sono mosse di gioco. Anche il GM può chiederti di chiarire una tua mossa.</p>'+
+  '<div class="chat-log">'+(rows||'<p class="muted">Ancora nessuno scambio.</p>')+'</div>'+
+  (AI.chatBusy?'<div class="wait ai"><span class="spin"></span><span>Il GM risponde…</span></div>':'')+
+  (AI.chatErr?'<div class="wait err"><p>'+esc(AI.chatErr)+'</p><div class="row">'+btn('Riprova','chatRetry','primary sm')+'</div></div>':'')+
+  (open?'<div class="row">'+btn('Interpreta tu','askSkip','sm ghost')+'</div>':'')+
+  (q?'<div class="re-on"><span>Su «'+esc(cut(q.text))+'»</span>'+btn('×','chatReClear','sm ghost','aria-label="Togli la citazione"')+'</div>':'')+
+  '<div class="ooc-in"><input data-d="chat" type="text" placeholder="'+(open?'Rispondi al GM…':'Chiedi al GM…')+'" value="'+esc(D.chat||'')+'">'+btn('Invia','chatSend','sm')+'</div></div>';
+}
 function moreHTML(){
  return '<div class="card slim"><div class="k">IA</div>'+(sample?'<p class="hint">'+(sample.setKey?'Ogni risposta dell’IA è a carico della tua chiave Anthropic.':'Ogni risposta dell’IA usa il tuo utilizzo di Claude.')+'</p>'+seg('ai_tier',[['quick','Veloce'],['default','Equilibrata'],['complex','Profonda']],AI.tier,'',"aiTier")+
   '<div class="row">'+btn(AI.paused?'Riprendi l’IA':'Metti l’IA in pausa','aiToggle','sm')+(sample.setKey?btn(sample.hasKey()?'Cambia la chiave API':'Imposta la chiave API','setKey','sm'):'')+'</div>':'<p class="muted">L’IA non è disponibile in questa vista.</p>')+'</div>'+
@@ -287,6 +313,10 @@ function waitHTML(exp){
  const aiSeats=(exp||[]).filter(s=>g.seats[s].kind==='ai');
  if(aiSeats.length&&isDriver()){
   if(!sample)return '<div class="wait err"><p>L’IA non è disponibile in questa vista: aprila dentro Claude e consenti l’uso di Claude.</p></div>';
+  if(askOpen(g)&&aiSeats.indexOf('gm')>=0){
+   const q=LOG.filter(e=>isChat(e)&&e.meta.ask).pop();
+   return '<div class="wait ask"><p><b>Il GM ti chiede un chiarimento</b>'+(q?': «'+esc(q.text)+'»':'.')+'</p><div class="row">'+btn('Rispondi','chatOpen','primary sm')+btn('Interpreta tu','askSkip','sm ghost')+'</div></div>';
+  }
   if(AI.err)return '<div class="wait err"><p>'+esc(AI.err)+'</p><div class="row">'+btn('Riprova','aiRetry','primary sm')+btn('Pausa','aiToggle','sm')+'</div></div>';
   if(AI.paused)return '<div class="wait"><p>L’IA è in pausa.</p><div class="row">'+btn('Riprendi','aiToggle','primary sm')+'</div></div>';
   return '<div class="wait ai"><span class="spin"></span><span>'+esc(AI.label||'L’IA sta pensando…')+'</span>'+btn('Ferma','aiStop','sm ghost')+'</div>';
@@ -507,6 +537,21 @@ const ACT={
  numPrev(){const n=parseInt(D.pc_num,10)||5;const e=$('#rngPrev');if(e)e.textContent=rngText(n)+'. Più basso = più magia, più alto = più combattimento.';},
  paceDesc(){},
  async ooc(){const t=v('ooc');if(!t)return;await A.ooc(ROLE,t);clear('ooc');},
+ async chatSend(){
+  const t=v('chat');if(!t||AI.chatBusy)return;
+  const re=D.chat_re||null,reply=askOpen(G);
+  clear('chat','chat_re');
+  await A.ooc('tb',t,re?{chat:1,re:re}:{chat:1});
+  if(reply){await A.askClose();return;}
+  if(!sample){toast('L’IA non è disponibile in questa vista.');return;}
+  // senza await: runAct terrebbe bloccati i pulsanti di gioco finché il GM risponde
+  answerChat(t,re);
+ },
+ chatRetry(){const p=AI.chatPending;if(p)answerChat(p.text,p.re);},
+ chatOpen(){ui.tab='chat';document.body.classList.add('drawer');lastSideKey='';render();const n=$('[data-d="chat"]');if(n)n.focus();},
+ chatRe(el){D.chat_re=el.dataset.id;ACT.chatOpen();},
+ chatReClear(){clear('chat_re');lastSideKey='';render();},
+ async askSkip(){await A.ooc('tb','Interpreta tu.',{chat:1});await A.askClose();},
  async createPC(){
   const name=v('pc_name');if(!name)throw 'Dai un nome alla trollbabe.';
   if(!D.pc_loc)throw 'Scegli dove sta andando.';
@@ -594,6 +639,7 @@ const ACT={
    else if(e.type==='gm'||e.type==='tb')t+='**'+whoLabel(e.type)+':** '+e.text+'\n\n';
    else if(e.type==='sys')t+='_'+e.text+'_\n\n';
    else if(e.type==='roll')t+='> d10 = '+m.v+' ('+TYPES[m.type].label+', numero '+m.n+'): '+(m.ok?'riuscito':'fallito')+'\n\n';
+   else if(e.type==='ooc')t+='> _Fuori gioco_ · **'+oocWho(e)+':** '+e.text.replace(/\n/g,'\n> ')+'\n\n';
    else if(e.type==='conflict')t+='> **Conflict** '+TYPES[m.type].label+' · '+PACES[m.pace].label+' · Goal: «'+m.goal+'»\n\n';
   });
   if(!downloads){toast('Il salvataggio non è disponibile in questa vista.');return;}
@@ -622,6 +668,7 @@ function setupEvents(){
   const a=e.target.closest('[data-act]');if(a)runAct(a);
  });
  document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target&&e.target.tagName==='INPUT'&&e.target.closest('.ooc-in')){e.preventDefault();const b=e.target.closest('.ooc-in').querySelector('[data-act]');if(b)b.click();return;}
   if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)&&e.target&&e.target.tagName==='TEXTAREA'){
    const p=$('#dock [data-primary]');if(p)p.click();
   }
