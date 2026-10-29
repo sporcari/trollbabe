@@ -48,6 +48,7 @@ function rollOk(type,n,v){if(type==='fighting')return v<n;if(type==='magic')retu
 function rangeText(r){return r[0]>r[1]?'—':(r[0]===r[1]?String(r[0]):r[0]+'–'+r[1]);}
 function adjPace(p,adj){return adj==='up'?Math.min(3,p+1):adj==='down'?Math.max(1,p-1):p;}
 function startBox(g){return g.pc&&g.pc.status==='injured'?1:0;}
+function lastSeries(c,res){return (res==='success'?c.succ:c.fail)+1>=c.pace;}
 // Costo per le Relationship usate come roll-again (tabella a p. 49)
 function relCost(outcome,pcStatus){
   if(outcome==='success')return pcStatus==='injured'?'ok':'injured';

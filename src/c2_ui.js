@@ -454,15 +454,16 @@ function pConflict(){
   case 'roll':{
    const rr=ranges(g.pc.number)[c.type];
    return head+'<div class="form rollbox"><div class="die" id="die">d10</div><div><h3>Serie '+c.series+' · '+BOXES[c.box].t+'</h3><p class="hint">'+TYPES[c.type].label+': '+TYPES[c.type].rule+'. Con il tuo numero ('+g.pc.number+') riesci con '+rangeText(rr)+'.'+(c.box>0?' Se fallisci: '+BOXES[c.box].f.toLowerCase()+'.':'')+'</p>'+btn('Tira il d10','roll','primary big')+'</div></div>';}
-  case 'narr_gm':
-   return head+rollNote(c)+'<div class="form"><h3>'+(c.kind==='success'?'Il Goal riesce':'La trollbabe è incapacitata')+'</h3><p class="hint">'+(c.kind==='success'?'Descrivi come, in un’immagine sola, valorizzando la giocatrice.':'Sii ostile ma coerente con il tipo di conflitto e con ciò che è successo: usa solo ciò che hai detto nel Fair and clear, nessuna nuova minaccia.')+'</p>'+fld('ng_text','Narrazione',{rows:3})+btn('Narra','narrGM','primary','data-primary="1"')+'</div>';
+  case 'narr_gm':{
+   const mid=c.kind==='success'&&!lastSeries(c,'success');
+   return head+rollNote(c)+'<div class="form"><h3>'+(c.kind!=='success'?'La trollbabe è incapacitata':mid?'Serie riuscita ('+(c.succ+1)+' su '+c.pace+')':'Il Goal riesce')+'</h3><p class="hint">'+(c.kind!=='success'?'Sii ostile ma coerente con il tipo di conflitto e con ciò che è successo: usa solo ciò che hai detto nel Fair and clear, nessuna nuova minaccia.':mid?'La trollbabe si avvicina al Goal ma non lo raggiunge ancora: descrivi questo passo in un’immagine sola.':'Descrivi come, in un’immagine sola, valorizzando la giocatrice.')+'</p>'+fld('ng_text','Narrazione',{rows:3})+btn('Narra','narrGM','primary','data-primary="1"')+'</div>';}
   case 'narr_tb':{
    const k=c.kind,tt={inconv:'Fallito: scomodata',injury:'Fallito: ferita',alt_incap:'Terzo roll-again riuscito'}[k];
    const hh={inconv:'Il Goal sta cedendo; la scomodità è solo un dettaglio.',injury:'Descrivi la ferita in modo che abbia senso per questo conflitto ('+({fighting:'ferite o sfinimento',magic:'contraccolpo mistico o spiriti ribelli',social:'orgoglio ferito, o una ritorsione fisica se la scena la rende plausibile'}[c.type])+'): resta finché non guarisci.',alt_incap:'Il Goal è perso e sei incapacitata, ma descrivi tu in che circostanze, meno gravi.'}[k];
    const items=availableItems(g);
    return head+rollNote(c)+'<div class="form"><h3>'+tt+'</h3><p class="hint">'+hh+'</p>'+fld('nt_text','Narra',{rows:3})+
     (k==='alt_incap'?btn('Narra','narrTB','primary','data-primary="1"'):
-     '<div class="row">'+btn('Mi fermo: il Goal fallisce','narrStop')+'</div>'+
+     '<div class="row">'+btn(lastSeries(c,'fail')?'Accetta l’esito: il Goal fallisce':'Accetta l’esito e vai alla Serie successiva','narrStop')+'</div>'+
      (items.length?'<div class="fld"><label>Oppure rilancia con un roll-again</label>'+itemSeg('nt_item',items)+'</div>'+btn('Rilancia','narrCont','primary'):'<p class="hint">Non hai più roll-again disponibili.</p>'))+'</div>';}
   case 'decide_tb':{
    const items=availableItems(g);
