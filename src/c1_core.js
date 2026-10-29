@@ -73,6 +73,11 @@ const ver=()=>G?G.seq+':'+(G.rev||''):null;
 // domanda di chiarimento del GM ancora aperta sull’ultima mossa (una nuova mossa la supera)
 const askOpen=g=>!!(g&&g.ask&&g.ask.open&&g.ask.at===g.logN);
 const isChat=e=>e.type==='ooc'&&!!(e.meta&&e.meta.chat);
+// retcon: per ogni voce del diario, le voci «amend» che la correggono (vale l’ultima)
+function amendMap(log){const m={};(log||LOG).forEach(e=>{if(e.type==='amend'&&e.meta&&e.meta.of)(m[e.meta.of]=m[e.meta.of]||[]).push(e);});return m;}
+const textOf=(e,m)=>{const a=(m||amendMap())[e._id];return a?a[a.length-1].text:e.text;};
+// con il GM IA e la trollbabe umana, ciò che lei narra nei conflitti passa dal GM prima del tiro successivo
+const needReview=g=>{if(g.seats.gm.kind==='ai'&&g.seats.tb.kind==='human')g.review={from:(g.logN||0)+1};};
 const gameRef=c=>db.doc('games/'+c);
 const logCol=c=>db.collection('games/'+c+'/log');
 const pcName=g=>(g.pc&&g.pc.name)||'La trollbabe';
@@ -288,11 +293,11 @@ const A={
  stepSay(seat,text){return tx((g,push)=>{
   const c=g.conflict;if(!c||c.stage!=='step')return false;
   if(seat==='gm'&&c.step.gm===null){c.step.gm=text||'';if(text)push('gm','gm',text,{kind:'step'});return;}
-  if(seat==='tb'&&c.step.gm!==null&&text){c.step.tb=text;push('tb','tb',text,{kind:'step'});c.stage='roll';return;}
+  if(seat==='tb'&&c.step.gm!==null&&text){c.step.tb=text;push('tb','tb',text,{kind:'step'});c.stage='roll';needReview(g);return;}
   return false;
  });},
  roll(v){return tx((g,push)=>{
-  const c=g.conflict;if(!c||c.stage!=='roll')return false;
+  const c=g.conflict;if(!c||c.stage!=='roll'||g.review||g.objection)return false;
   const ok=rollOk(c.type,g.pc.number,v),box=c.box;
   c.roll={v:v,ok:ok,box:box};
   push('roll','tb','',{v:v,ok:ok,box:box,type:c.type,n:g.pc.number,series:c.series});
@@ -313,7 +318,7 @@ const A={
  });},
  narrTB(text,choice){return tx((g,push)=>{
   const c=g.conflict;if(!c||c.stage!=='narr_tb')return false;
-  push('tb','tb',text,{kind:c.kind});c.lastNarr='tb';
+  push('tb','tb',text,{kind:c.kind});c.lastNarr='tb';needReview(g);
   if(c.kind==='injury'&&!g.pc.hurt)g.pc.hurt=String(text).slice(0,300);
   if(c.kind==='alt_incap'){endSeries(g,push,'fail');return;}
   if(choice&&choice.item){
@@ -327,7 +332,7 @@ const A={
   if(c.kind==='incap'){
    if(choice.item){
     const lab=useItem(g,choice.item);if(!lab)return false;
-    if(choice.text){push('tb','tb',choice.text,{kind:'item'});c.lastNarr='tb';}
+    if(choice.text){push('tb','tb',choice.text,{kind:'item'});c.lastNarr='tb';needReview(g);}
     c.box=3;c.stage='roll';c.roll=null;push('sys','','Ultimo roll-again: '+lab+'.');
    }else endSeries(g,push,'fail');
   }else{
@@ -346,6 +351,13 @@ const A={
   });
   afterConflict(g,push);
  });},
+ amend(seat,id,text){return tx((g,push)=>{
+  const e=LOG.find(x=>x._id===id);
+  if(!e||e.who!==seat||['scene','gm','tb'].indexOf(e.type)<0||!text||text===textOf(e))return false;
+  push('amend',seat,text,{of:id});
+  if(g.objection&&g.objection.of===id)g.objection=null;
+ });},
+ objectionClose(){return tx(g=>{if(!g.objection)return false;g.objection=null;});},
  relSkip(){return tx((g)=>{if(g.step!=='rel_offer')return false;g.step='scene_play';});},
  relPropose(o){return tx((g,push)=>{
   if(g.step!=='rel_offer')return false;
@@ -370,6 +382,8 @@ const A={
 
 function expected(g){
  g=g||G;if(!g)return [];
+ if(g.review)return ['gm'];
+ if(g.objection)return ['tb'];
  const c=g.conflict;
  switch(g.step){
   case 'tb_create':case 'scene_request':case 'rel_offer':case 'interim':return ['tb'];

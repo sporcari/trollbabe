@@ -12,6 +12,7 @@ const ai={
                  : {text:'Il molo brucia.',end_adventure:true},
   fair_gm:()=>({text:'Hrenk avanza minaccioso.'}),
   step_gm:()=>({text:'Hrenk ritenta.'}),
+  review:()=>({objection:null}),
   narr_gm:()=>({text:'Un colpo netto.'}),
   ending:()=>({outcome:'b',text:'Il porto cade.'}),
 };

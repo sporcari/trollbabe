@@ -200,12 +200,16 @@ function renderTop(){
  p.classList.toggle('hidden',g.seats.gm.kind==='ai'||g.seats.tb.kind==='ai');
 }
 const KIND={fair:'apre il conflitto',step:'passo',success:'successo',incap:'incapacitata',inconv:'scomodata',injury:'ferita',alt_incap:'incapacitata, ma a modo suo',death:'morte',item:'roll-again',rel:'Relationship',epilogue:'epilogo'};
-function entryHTML(e){
- const m=e.meta||{};
+const amBtn=e=>ROLE===e.who&&G.seats[e.who].kind==='human'?btn('Emenda','amendOpen','sm ghost am','data-id="'+e._id+'"'):'';
+function entryHTML(e,am){
+ const m=e.meta||{},a=(am||{})[e._id],txt=a?a[a.length-1].text:e.text;
+ const was=a?'<details class="was"><summary>emendato · versione precedente</summary><p>'+nl(a.length>1?a[a.length-2].text:e.text)+'</p></details>':'';
+ const art=(cls,head,q)=>'<article class="e '+cls+'" data-id="'+e._id+'">'+(q?qBtn(e):'')+amBtn(e)+head+'<p>'+nl(txt)+'</p>'+was+'</article>';
  switch(e.type){
-  case 'scene':return '<article class="e scene">'+qBtn(e)+'<h3>Scena '+(m.scene||'')+' — '+esc(m.loc||'')+'</h3><p>'+nl(e.text)+'</p></article>';
-  case 'gm':return '<article class="e gm">'+qBtn(e)+'<div class="who">'+esc(whoLabel('gm'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
-  case 'tb':return '<article class="e tb"><div class="who">'+esc(whoLabel('tb'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
+  case 'scene':return art('scene','<h3>Scena '+(m.scene||'')+' — '+esc(m.loc||'')+'</h3>',true);
+  case 'gm':return art('gm','<div class="who">'+esc(whoLabel('gm'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div>',true);
+  case 'tb':return art('tb','<div class="who">'+esc(whoLabel('tb'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div>',false);
+  case 'amend':return '<div class="e sys retcon">Retcon '+(e.who==='gm'?'del GM':'di '+esc(pcName(G)))+': «'+esc(cut(e.text))+'»</div>';
   case 'sys':if(m.kind==='veto'||m.kind==='rel_ok')return '<div class="e verdict '+(m.kind==='veto'?'veto':'ok')+'"><b>'+(m.kind==='veto'?'Veto del GM':'Relationship accettata')+'</b> '+esc(e.text)+'</div>';return '<div class="e sys">'+esc(e.text)+'</div>';
   case 'ooc':if(isChat(e))return '';return '<div class="e ooc"><b>'+esc(oocWho(e))+'</b> (fuori gioco): '+esc(e.text)+'</div>';
   case 'roll':return '<div class="e roll '+(m.ok?'win':'lose')+'"><span class="d10">'+m.v+'</span><span>'+(TYPES[m.type]?TYPES[m.type].label:'')+' · numero '+m.n+' · '+(m.ok?'riuscito':'fallito')+(m.ok?'':' · '+BOXES[m.box].f)+'</span></div>';
@@ -222,7 +226,12 @@ function renderLog(){
  if(!ok){el.innerHTML='';renderedIds=[];}
  const first=renderedIds.length===0;
  const near=el.scrollHeight-el.scrollTop-el.clientHeight<140;
- for(let i=renderedIds.length;i<LOG.length;i++){el.insertAdjacentHTML('beforeend',entryHTML(LOG[i]));renderedIds.push(LOG[i]._id);}
+ const am=amendMap(LOG);
+ for(let i=renderedIds.length;i<LOG.length;i++){
+  const e=LOG[i];el.insertAdjacentHTML('beforeend',entryHTML(e,am));renderedIds.push(e._id);
+  // un retcon ridisegna sul posto la voce che corregge
+  if(e.type==='amend'){const t=el.querySelector('article[data-id="'+e.meta.of+'"]'),o=LOG.find(x=>x._id===e.meta.of);if(t&&o)t.outerHTML=entryHTML(o,am);}
+ }
  renderedN=renderedIds.length;
  if(near||first||!ok)el.scrollTop=el.scrollHeight;
 }
@@ -283,7 +292,7 @@ function chatHTML(){
  const find=id=>id&&LOG.find(x=>x._id===id);
  const rows=LOG.filter(isChat).map(e=>{
   const q=find(e.meta.re);
-  return '<div class="cm '+(e.who==='gm'?'gm':'me')+(e.meta.ask?' ask':'')+'"><b>'+(e.who==='gm'?(e.meta.ask?'Il GM chiede':'GM'):'Tu')+'</b>'+(q?'<span class="re">su «'+esc(cut(q.text))+'»</span>':'')+'<p>'+nl(e.text)+'</p></div>';
+  return '<div class="cm '+(e.who==='gm'?'gm':'me')+(e.meta.ask||e.meta.objection?' ask':'')+'"><b>'+(e.who==='gm'?(e.meta.objection?'Il GM eccepisce':e.meta.ask?'Il GM chiede':'GM'):'Tu')+'</b>'+(q?'<span class="re">su «'+esc(cut(q.text))+'»</span>':'')+'<p>'+nl(e.text)+'</p></div>';
  }).join('');
  const q=find(D.chat_re),open=askOpen(G);
  return '<div class="card slim chat"><div class="k">Al tavolo, fuori gioco</div><p class="hint">Domande, chiarimenti e correzioni al GM: non sono mosse di gioco. Anche il GM può chiederti di chiarire una tua mossa.</p>'+
@@ -325,6 +334,8 @@ function dockHTML(){
  const g=G;
  if(!ROLE)return '<p class="muted">Stai guardando questa partita senza un posto al tavolo.</p>';
  if(!g.pc&&g.step!=='lobby'&&g.step!=='tb_create')return '<div class="wait"><span class="dot"></span><span>Sincronizzazione in corso…</span></div>';
+ if(ui.amending)return amendHTML();
+ if(g.objection&&ROLE==='tb')return objectionHTML()+oocHTML();
  let h='';
  switch(g.step){
   case 'lobby':h=pLobby();break;
@@ -340,6 +351,17 @@ function dockHTML(){
   case 'interim':h=ROLE==='tb'?pInterim():waitHTML(['tb']);break;
  }
  return h+oocHTML();
+}
+function amendHTML(){
+ const e=LOG.find(x=>x._id===ui.amending);
+ if(!e){ui.amending=null;return '';}
+ return '<div class="form"><h3>Emenda</h3><p class="hint">La nuova versione prende il posto di questa nel diario; quella di prima resta consultabile. Vale da ora in poi.</p>'+
+  fld('am_text','Nuova versione',{rows:4,def:textOf(e)})+'<div class="row">'+btn('Salva la correzione','amendSave','primary')+btn('Annulla','amendCancel','ghost')+'</div></div>';
+}
+function objectionHTML(){
+ const o=G.objection,e=LOG.find(x=>x._id===o.of);
+ return '<div class="wait ask"><p><b>Il GM ha un’eccezione</b>: '+esc(o.why)+'</p>'+(e?'<p class="hint">Su «'+esc(cut(textOf(e)))+'»</p>':'')+
+  '<p class="hint">Rettifica la tua frase, oppure spiega in chat perché va bene così.</p><div class="row">'+(e?btn('Rettifica','amendOpen','primary sm','data-id="'+e._id+'"'):'')+btn('Rispondi in chat','chatOpen','sm')+'</div></div>';
 }
 function pLobby(){
  return '<div class="lobby"><div class="k">Codice della partita</div><div class="code">'+G.code+'</div>'+
@@ -549,6 +571,14 @@ const ACT={
  chatOpen(){ui.tab='chat';document.body.classList.add('drawer');lastSideKey='';render();const n=$('[data-d="chat"]');if(n)n.focus();},
  chatRe(el){D.chat_re=el.dataset.id;ACT.chatOpen();},
  chatReClear(){clear('chat_re');lastSideKey='';render();},
+ amendOpen(el){ui.amending=el.dataset.id;delete D.am_text;ui.rev++;render();},
+ amendCancel(){ui.amending=null;clear('am_text');ui.rev++;render();},
+ async amendSave(){
+  const t=v('am_text'),e=LOG.find(x=>x._id===ui.amending);if(!t)throw 'Scrivi la nuova versione.';
+  if(e&&t===textOf(e))throw 'Non hai cambiato nulla.';
+  if(!await A.amend(ROLE,ui.amending,t))throw 'Questa voce non si può emendare.';
+  ui.amending=null;clear('am_text');ui.rev++;render();
+ },
  async askSkip(){await A.ooc('tb','Interpreta tu.',{chat:1});await A.askClose();},
  async createPC(){
   const name=v('pc_name');if(!name)throw 'Dai un nome alla trollbabe.';
@@ -633,10 +663,11 @@ const ACT={
  },
  async exportDiary(){
   let t='# Trollbabe — partita '+G.code+'\n\n';
+  const am=amendMap(LOG),cur=e=>textOf(e,am)+(am[e._id]?' _(emendato)_':'');
   LOG.forEach(e=>{
    const m=e.meta||{};
-   if(e.type==='scene')t+='\n## Scena '+m.scene+' — '+m.loc+'\n\n'+e.text+'\n\n';
-   else if(e.type==='gm'||e.type==='tb')t+='**'+whoLabel(e.type)+':** '+e.text+'\n\n';
+   if(e.type==='scene')t+='\n## Scena '+m.scene+' — '+m.loc+'\n\n'+cur(e)+'\n\n';
+   else if(e.type==='gm'||e.type==='tb')t+='**'+whoLabel(e.type)+':** '+cur(e)+'\n\n';
    else if(e.type==='sys')t+='_'+e.text+'_\n\n';
    else if(e.type==='roll')t+='> d10 = '+m.v+' ('+TYPES[m.type].label+', numero '+m.n+'): '+(m.ok?'riuscito':'fallito')+'\n\n';
    else if(e.type==='ooc')t+='> _Fuori gioco_ · **'+oocWho(e)+':** '+e.text.replace(/\n/g,'\n> ')+'\n\n';

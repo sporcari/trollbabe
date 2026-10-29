@@ -166,6 +166,11 @@ summary{font-family:var(--sans);font-size:.88rem;cursor:pointer;color:var(--ink2
 .ooc-in{display:flex;gap:.5rem;margin-top:.7rem;padding-top:.5rem;border-top:1px dashed var(--ink2)}
 .e .q{display:none;float:right;min-width:1.7rem;padding:0 .35rem;margin-left:.4rem}
 body.chaton .e .q{display:inline-block}
+.e .am{float:right;padding:0 .35rem;margin-left:.4rem;font-size:.75rem;opacity:.6}
+.e .am:hover,.e .am:focus{opacity:1}
+.e .was{font-family:var(--sans);font-size:.8rem;color:var(--ink2)}
+.e .was p{font-style:italic}
+.e.retcon{font-style:italic}
 .chat-log{display:flex;flex-direction:column;gap:.5rem;margin:.4rem 0}
 .cm{font-family:var(--sans);font-size:.9rem;line-height:1.4;padding:.3rem .55rem;border-left:3px solid var(--ink2)}
 .cm p{margin:.1rem 0 0}
@@ -325,6 +330,11 @@ const ver=()=>G?G.seq+':'+(G.rev||''):null;
 // domanda di chiarimento del GM ancora aperta sull’ultima mossa (una nuova mossa la supera)
 const askOpen=g=>!!(g&&g.ask&&g.ask.open&&g.ask.at===g.logN);
 const isChat=e=>e.type==='ooc'&&!!(e.meta&&e.meta.chat);
+// retcon: per ogni voce del diario, le voci «amend» che la correggono (vale l’ultima)
+function amendMap(log){const m={};(log||LOG).forEach(e=>{if(e.type==='amend'&&e.meta&&e.meta.of)(m[e.meta.of]=m[e.meta.of]||[]).push(e);});return m;}
+const textOf=(e,m)=>{const a=(m||amendMap())[e._id];return a?a[a.length-1].text:e.text;};
+// con il GM IA e la trollbabe umana, ciò che lei narra nei conflitti passa dal GM prima del tiro successivo
+const needReview=g=>{if(g.seats.gm.kind==='ai'&&g.seats.tb.kind==='human')g.review={from:(g.logN||0)+1};};
 const gameRef=c=>db.doc('games/'+c);
 const logCol=c=>db.collection('games/'+c+'/log');
 const pcName=g=>(g.pc&&g.pc.name)||'La trollbabe';
@@ -540,11 +550,11 @@ const A={
  stepSay(seat,text){return tx((g,push)=>{
   const c=g.conflict;if(!c||c.stage!=='step')return false;
   if(seat==='gm'&&c.step.gm===null){c.step.gm=text||'';if(text)push('gm','gm',text,{kind:'step'});return;}
-  if(seat==='tb'&&c.step.gm!==null&&text){c.step.tb=text;push('tb','tb',text,{kind:'step'});c.stage='roll';return;}
+  if(seat==='tb'&&c.step.gm!==null&&text){c.step.tb=text;push('tb','tb',text,{kind:'step'});c.stage='roll';needReview(g);return;}
   return false;
  });},
  roll(v){return tx((g,push)=>{
-  const c=g.conflict;if(!c||c.stage!=='roll')return false;
+  const c=g.conflict;if(!c||c.stage!=='roll'||g.review||g.objection)return false;
   const ok=rollOk(c.type,g.pc.number,v),box=c.box;
   c.roll={v:v,ok:ok,box:box};
   push('roll','tb','',{v:v,ok:ok,box:box,type:c.type,n:g.pc.number,series:c.series});
@@ -565,7 +575,7 @@ const A={
  });},
  narrTB(text,choice){return tx((g,push)=>{
   const c=g.conflict;if(!c||c.stage!=='narr_tb')return false;
-  push('tb','tb',text,{kind:c.kind});c.lastNarr='tb';
+  push('tb','tb',text,{kind:c.kind});c.lastNarr='tb';needReview(g);
   if(c.kind==='injury'&&!g.pc.hurt)g.pc.hurt=String(text).slice(0,300);
   if(c.kind==='alt_incap'){endSeries(g,push,'fail');return;}
   if(choice&&choice.item){
@@ -579,7 +589,7 @@ const A={
   if(c.kind==='incap'){
    if(choice.item){
     const lab=useItem(g,choice.item);if(!lab)return false;
-    if(choice.text){push('tb','tb',choice.text,{kind:'item'});c.lastNarr='tb';}
+    if(choice.text){push('tb','tb',choice.text,{kind:'item'});c.lastNarr='tb';needReview(g);}
     c.box=3;c.stage='roll';c.roll=null;push('sys','','Ultimo roll-again: '+lab+'.');
    }else endSeries(g,push,'fail');
   }else{
@@ -598,6 +608,13 @@ const A={
   });
   afterConflict(g,push);
  });},
+ amend(seat,id,text){return tx((g,push)=>{
+  const e=LOG.find(x=>x._id===id);
+  if(!e||e.who!==seat||['scene','gm','tb'].indexOf(e.type)<0||!text||text===textOf(e))return false;
+  push('amend',seat,text,{of:id});
+  if(g.objection&&g.objection.of===id)g.objection=null;
+ });},
+ objectionClose(){return tx(g=>{if(!g.objection)return false;g.objection=null;});},
  relSkip(){return tx((g)=>{if(g.step!=='rel_offer')return false;g.step='scene_play';});},
  relPropose(o){return tx((g,push)=>{
   if(g.step!=='rel_offer')return false;
@@ -622,6 +639,8 @@ const A={
 
 function expected(g){
  g=g||G;if(!g)return [];
+ if(g.review)return ['gm'];
+ if(g.objection)return ['tb'];
  const c=g.conflict;
  switch(g.step){
   case 'tb_create':case 'scene_request':case 'rel_offer':case 'interim':return ['tb'];
@@ -840,12 +859,16 @@ function renderTop(){
  p.classList.toggle('hidden',g.seats.gm.kind==='ai'||g.seats.tb.kind==='ai');
 }
 const KIND={fair:'apre il conflitto',step:'passo',success:'successo',incap:'incapacitata',inconv:'scomodata',injury:'ferita',alt_incap:'incapacitata, ma a modo suo',death:'morte',item:'roll-again',rel:'Relationship',epilogue:'epilogo'};
-function entryHTML(e){
- const m=e.meta||{};
+const amBtn=e=>ROLE===e.who&&G.seats[e.who].kind==='human'?btn('Emenda','amendOpen','sm ghost am','data-id="'+e._id+'"'):'';
+function entryHTML(e,am){
+ const m=e.meta||{},a=(am||{})[e._id],txt=a?a[a.length-1].text:e.text;
+ const was=a?'<details class="was"><summary>emendato · versione precedente</summary><p>'+nl(a.length>1?a[a.length-2].text:e.text)+'</p></details>':'';
+ const art=(cls,head,q)=>'<article class="e '+cls+'" data-id="'+e._id+'">'+(q?qBtn(e):'')+amBtn(e)+head+'<p>'+nl(txt)+'</p>'+was+'</article>';
  switch(e.type){
-  case 'scene':return '<article class="e scene">'+qBtn(e)+'<h3>Scena '+(m.scene||'')+' — '+esc(m.loc||'')+'</h3><p>'+nl(e.text)+'</p></article>';
-  case 'gm':return '<article class="e gm">'+qBtn(e)+'<div class="who">'+esc(whoLabel('gm'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
-  case 'tb':return '<article class="e tb"><div class="who">'+esc(whoLabel('tb'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div><p>'+nl(e.text)+'</p></article>';
+  case 'scene':return art('scene','<h3>Scena '+(m.scene||'')+' — '+esc(m.loc||'')+'</h3>',true);
+  case 'gm':return art('gm','<div class="who">'+esc(whoLabel('gm'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div>',true);
+  case 'tb':return art('tb','<div class="who">'+esc(whoLabel('tb'))+(m.kind?' <i>'+(KIND[m.kind]||'')+'</i>':'')+'</div>',false);
+  case 'amend':return '<div class="e sys retcon">Retcon '+(e.who==='gm'?'del GM':'di '+esc(pcName(G)))+': «'+esc(cut(e.text))+'»</div>';
   case 'sys':if(m.kind==='veto'||m.kind==='rel_ok')return '<div class="e verdict '+(m.kind==='veto'?'veto':'ok')+'"><b>'+(m.kind==='veto'?'Veto del GM':'Relationship accettata')+'</b> '+esc(e.text)+'</div>';return '<div class="e sys">'+esc(e.text)+'</div>';
   case 'ooc':if(isChat(e))return '';return '<div class="e ooc"><b>'+esc(oocWho(e))+'</b> (fuori gioco): '+esc(e.text)+'</div>';
   case 'roll':return '<div class="e roll '+(m.ok?'win':'lose')+'"><span class="d10">'+m.v+'</span><span>'+(TYPES[m.type]?TYPES[m.type].label:'')+' · numero '+m.n+' · '+(m.ok?'riuscito':'fallito')+(m.ok?'':' · '+BOXES[m.box].f)+'</span></div>';
@@ -862,7 +885,12 @@ function renderLog(){
  if(!ok){el.innerHTML='';renderedIds=[];}
  const first=renderedIds.length===0;
  const near=el.scrollHeight-el.scrollTop-el.clientHeight<140;
- for(let i=renderedIds.length;i<LOG.length;i++){el.insertAdjacentHTML('beforeend',entryHTML(LOG[i]));renderedIds.push(LOG[i]._id);}
+ const am=amendMap(LOG);
+ for(let i=renderedIds.length;i<LOG.length;i++){
+  const e=LOG[i];el.insertAdjacentHTML('beforeend',entryHTML(e,am));renderedIds.push(e._id);
+  // un retcon ridisegna sul posto la voce che corregge
+  if(e.type==='amend'){const t=el.querySelector('article[data-id="'+e.meta.of+'"]'),o=LOG.find(x=>x._id===e.meta.of);if(t&&o)t.outerHTML=entryHTML(o,am);}
+ }
  renderedN=renderedIds.length;
  if(near||first||!ok)el.scrollTop=el.scrollHeight;
 }
@@ -923,7 +951,7 @@ function chatHTML(){
  const find=id=>id&&LOG.find(x=>x._id===id);
  const rows=LOG.filter(isChat).map(e=>{
   const q=find(e.meta.re);
-  return '<div class="cm '+(e.who==='gm'?'gm':'me')+(e.meta.ask?' ask':'')+'"><b>'+(e.who==='gm'?(e.meta.ask?'Il GM chiede':'GM'):'Tu')+'</b>'+(q?'<span class="re">su «'+esc(cut(q.text))+'»</span>':'')+'<p>'+nl(e.text)+'</p></div>';
+  return '<div class="cm '+(e.who==='gm'?'gm':'me')+(e.meta.ask||e.meta.objection?' ask':'')+'"><b>'+(e.who==='gm'?(e.meta.objection?'Il GM eccepisce':e.meta.ask?'Il GM chiede':'GM'):'Tu')+'</b>'+(q?'<span class="re">su «'+esc(cut(q.text))+'»</span>':'')+'<p>'+nl(e.text)+'</p></div>';
  }).join('');
  const q=find(D.chat_re),open=askOpen(G);
  return '<div class="card slim chat"><div class="k">Al tavolo, fuori gioco</div><p class="hint">Domande, chiarimenti e correzioni al GM: non sono mosse di gioco. Anche il GM può chiederti di chiarire una tua mossa.</p>'+
@@ -965,6 +993,8 @@ function dockHTML(){
  const g=G;
  if(!ROLE)return '<p class="muted">Stai guardando questa partita senza un posto al tavolo.</p>';
  if(!g.pc&&g.step!=='lobby'&&g.step!=='tb_create')return '<div class="wait"><span class="dot"></span><span>Sincronizzazione in corso…</span></div>';
+ if(ui.amending)return amendHTML();
+ if(g.objection&&ROLE==='tb')return objectionHTML()+oocHTML();
  let h='';
  switch(g.step){
   case 'lobby':h=pLobby();break;
@@ -980,6 +1010,17 @@ function dockHTML(){
   case 'interim':h=ROLE==='tb'?pInterim():waitHTML(['tb']);break;
  }
  return h+oocHTML();
+}
+function amendHTML(){
+ const e=LOG.find(x=>x._id===ui.amending);
+ if(!e){ui.amending=null;return '';}
+ return '<div class="form"><h3>Emenda</h3><p class="hint">La nuova versione prende il posto di questa nel diario; quella di prima resta consultabile. Vale da ora in poi.</p>'+
+  fld('am_text','Nuova versione',{rows:4,def:textOf(e)})+'<div class="row">'+btn('Salva la correzione','amendSave','primary')+btn('Annulla','amendCancel','ghost')+'</div></div>';
+}
+function objectionHTML(){
+ const o=G.objection,e=LOG.find(x=>x._id===o.of);
+ return '<div class="wait ask"><p><b>Il GM ha un’eccezione</b>: '+esc(o.why)+'</p>'+(e?'<p class="hint">Su «'+esc(cut(textOf(e)))+'»</p>':'')+
+  '<p class="hint">Rettifica la tua frase, oppure spiega in chat perché va bene così.</p><div class="row">'+(e?btn('Rettifica','amendOpen','primary sm','data-id="'+e._id+'"'):'')+btn('Rispondi in chat','chatOpen','sm')+'</div></div>';
 }
 function pLobby(){
  return '<div class="lobby"><div class="k">Codice della partita</div><div class="code">'+G.code+'</div>'+
@@ -1189,6 +1230,14 @@ const ACT={
  chatOpen(){ui.tab='chat';document.body.classList.add('drawer');lastSideKey='';render();const n=$('[data-d="chat"]');if(n)n.focus();},
  chatRe(el){D.chat_re=el.dataset.id;ACT.chatOpen();},
  chatReClear(){clear('chat_re');lastSideKey='';render();},
+ amendOpen(el){ui.amending=el.dataset.id;delete D.am_text;ui.rev++;render();},
+ amendCancel(){ui.amending=null;clear('am_text');ui.rev++;render();},
+ async amendSave(){
+  const t=v('am_text'),e=LOG.find(x=>x._id===ui.amending);if(!t)throw 'Scrivi la nuova versione.';
+  if(e&&t===textOf(e))throw 'Non hai cambiato nulla.';
+  if(!await A.amend(ROLE,ui.amending,t))throw 'Questa voce non si può emendare.';
+  ui.amending=null;clear('am_text');ui.rev++;render();
+ },
  async askSkip(){await A.ooc('tb','Interpreta tu.',{chat:1});await A.askClose();},
  async createPC(){
   const name=v('pc_name');if(!name)throw 'Dai un nome alla trollbabe.';
@@ -1273,10 +1322,11 @@ const ACT={
  },
  async exportDiary(){
   let t='# Trollbabe — partita '+G.code+'\n\n';
+  const am=amendMap(LOG),cur=e=>textOf(e,am)+(am[e._id]?' _(emendato)_':'');
   LOG.forEach(e=>{
    const m=e.meta||{};
-   if(e.type==='scene')t+='\n## Scena '+m.scene+' — '+m.loc+'\n\n'+e.text+'\n\n';
-   else if(e.type==='gm'||e.type==='tb')t+='**'+whoLabel(e.type)+':** '+e.text+'\n\n';
+   if(e.type==='scene')t+='\n## Scena '+m.scene+' — '+m.loc+'\n\n'+cur(e)+'\n\n';
+   else if(e.type==='gm'||e.type==='tb')t+='**'+whoLabel(e.type)+':** '+cur(e)+'\n\n';
    else if(e.type==='sys')t+='_'+e.text+'_\n\n';
    else if(e.type==='roll')t+='> d10 = '+m.v+' ('+TYPES[m.type].label+', numero '+m.n+'): '+(m.ok?'riuscito':'fallito')+'\n\n';
    else if(e.type==='ooc')t+='> _Fuori gioco_ · **'+oocWho(e)+':** '+e.text.replace(/\n/g,'\n> ')+'\n\n';
@@ -1328,6 +1378,7 @@ const GM_RULES='Sei il GM di una partita di TROLLBABE (gioco di ruolo fantasy no
 '• Una scena è definita da luogo e personaggi presenti. Chiudila con un cambio sostanziale di luogo o a una pausa naturale. Il Scale limita ciò che la trollbabe può compiere di persona.\n'+
 '• Se narri un successo: una sola immagine forte, nello stile della giocatrice. Se la trollbabe è incapacitata: sii ostile ma coerente.\n'+
 '• Gli Stakes si risolvono da soli per la loro tensione: non spingerli, esprimili attraverso i PNG. Non rivelare mai in modo esplicito la preparazione segreta.\n'+
+'• Incoerenze: se emerge una contraddizione, correggi un dettaglio minore (età, date, distanze, chi era presente) in modo da salvare la preparazione segreta e ciò che è stato decisivo in gioco; mai gli Stakes, gli esiti o chi ha fatto cosa nel retroscena. Il retcon si dichiara al tavolo, nella chat fuori gioco, non per bocca di un PNG.\n'+
 '• Se la trollbabe è ferita o incapacitata, nello STATO trovi come: tienine conto nelle scene seguenti e falla pesare in modo coerente. Una ferita o un’incapacità deve sempre avere senso rispetto al tipo di conflitto (contraccolpo mistico per Magic, ferite o sfinimento per Fighting, orgoglio ferito o ritorsione per Social) e a ciò che è accaduto.\n'+
 '• RITMO MORBIDO: lascia sempre spazio alla giocatrice. Una scena si apre con luogo, circostanze immediate e chi c’è (in genere al massimo un PNG che agisce o parla), poi ti fermi in un punto in cui la trollbabe può rispondere. Non incalzare verso gli Stakes: emergono a poco a poco dalle persone, e sta alla giocatrice andare a cercarli. Una sola mossa per volta: niente più PNG o eventi insieme, niente battute che chiedano già alla trollbabe di agire, mai anticipare ciò che farà lei.\n'+
 'Scrivi al massimo 60 parole per risposta, salvo diversa indicazione.';
@@ -1364,12 +1415,14 @@ function stateText(role,noSecret){
  }
  return L.join('\n');
 }
-function logText(){
- const rows=LOG.slice(-24).map(e=>{
-  const m=e.meta||{};
-  if(e.type==='scene')return 'SCENA '+m.scene+' ('+m.loc+') GM: '+e.text;
-  if(e.type==='gm')return 'GM: '+e.text;
-  if(e.type==='tb')return pcName(G)+': '+e.text;
+// num: numera le voci, così il GM può indicare quale correggere o contestare
+function logText(num){
+ const am=amendMap(LOG),ref=e=>num?'#'+e.n+' ':'';
+ const rows=LOG.filter(e=>e.type!=='amend'&&!isChat(e)).slice(-24).map(e=>{
+  const m=e.meta||{},t=textOf(e,am);
+  if(e.type==='scene')return ref(e)+'SCENA '+m.scene+' ('+m.loc+') GM: '+t;
+  if(e.type==='gm')return ref(e)+'GM: '+t;
+  if(e.type==='tb')return ref(e)+pcName(G)+': '+t;
   if(e.type==='sys')return '['+e.text+']';
   if(e.type==='roll')return '[d10='+m.v+' '+TYPES[m.type].label+' numero '+m.n+' → '+(m.ok?'riuscito':'fallito')+']';
   if(e.type==='conflict')return '[CONFLICT '+TYPES[m.type].label+', Pace '+m.pace+', Goal: '+m.goal+']';
@@ -1387,13 +1440,14 @@ const TASKS={
  pc_create:()=>'Crea la tua trollbabe. "number" va da 2 a 9: più basso = più brava in magia, più alto = più brava a combattere. Per fight/magic/social usa solo i valori ammessi. "loc" è il numero del luogo verso cui sta camminando: '+LOCS.map(l=>l.id+' '+l.name).join(', ')+'. Per capelli, corna, abiti, equipaggiamento e due oggetti (uno umano, uno troll: personali, non preziosi) scrivi descrizioni brevi e vivide.',
  gm_prep:()=>'Prepara in segreto l’avventura per '+G.locName+' al Scale '+G.scale+' ('+SCALES[G.scale-1]+'). "where": immagini concrete del luogo. "who": chi c’è (umani, troll o entrambi) e cosa fa: nessun luogo è vuoto. "stakes": una persona, luogo o cosa della taglia del Scale che qualcuno vuole (NON un obiettivo di trama, NON qualcosa che riguarda la trollbabe). "a" e "b": due esiti concreti e opposti degli Stakes, senza come né perché. "characters": 3–5 personaggi con nome e ciò che vogliono, legati tra loro (parentele, rivalità, desideri) in modo da stringere attorno agli Stakes. Il misto umani/troll funziona meglio; ogni tanto un elemento strano che accentui la tensione emotiva degli Stakes. Nei campi di testo scrivi al massimo 60 parole ciascuno.',
  scene_open:()=>(G.scene===0?'È la prima scena: la storia si apre con la trollbabe che cammina verso il luogo; mostra il luogo e al massimo una presenza, senza mettere già in scena la posta in gioco. ':'')+'Apri la scena: dì dove siamo, le circostanze immediate e chi c’è. Massimo 50 parole, al più un PNG che agisce o parla, e fermati dove la trollbabe può rispondere. '+(G.scene>0?'Rispetta la richiesta di scena della giocatrice, tranne se qualcuno si sta già muovendo per cercarla: in quel caso inizia nel punto dell’interruzione. ':'')+'In "npcs" elenca i nomi dei PNG con nome che introduci. "heal": true solo se la richiesta era una scena di cura e la concedi (se il luogo la rende problematica, concedila comunque: potrai chiamare un conflitto).',
- gm_respond:()=>'È il tuo turno di GM. Una sola mossa, massimo 50 parole, che lasci alla giocatrice il tempo di rispondere (niente eventi a catena, un solo PNG che parla alla volta). Reagisci a ciò che la trollbabe ha appena fatto o detto: descrivi ciò che si vede e le azioni e parole dei PNG (di parte, espliciti su ciò che vogliono). Applica il test dei Conflitti: se a un personaggio non sta bene che l’azione di lei vada come dichiara, o un gesto mette sotto stress il suo rapporto con gli Stakes, o un PNG agisce contro di lei, chiama il conflitto: "conflict" con type e pace (altrimenti null). Se lo chiami, fermati PRIMA dell’esito: descrivi solo l’istante dell’azione e la reazione del PNG, mai il risultato (niente «cade morto», «la scure lo colpisce»). Se la scena è a una pausa naturale o i personaggi hanno cambiato luogo, "end_scene": true. Se gli Stakes hanno raggiunto una condizione finale, "end_adventure": true. Se la trollbabe è incapacitata, chiudi la scena. Se la giocatrice ha deciso di lasciare il luogo, decidi se qualcuno cerca di fermarla (conflict) oppure "end_adventure": true. In "npcs" i nomi dei nuovi PNG con nome.'+askHelp(),
- table_talk:()=>'Sei al tavolo, fuori dal gioco: la giocatrice ti parla da persona a persona (la sua domanda è nelle NOTE), non è la trollbabe che parla ai PNG. Rispondi come GM, in prima persona, senza narrare e senza far parlare i PNG. Chiarisci la fiction già stabilita (età, distanze, chi è presente, cosa si vede o si sente). Se ti fa notare un’incoerenza o un errore, riconoscilo e correggi la fiction in modo esplicito («Hai ragione: …»): la correzione vale da ora in poi. Puoi fissare piccoli dettagli coerenti come faresti al tavolo, ma non rivelare la preparazione segreta (Stakes, esiti, retroscena, segreti dei PNG): se la domanda tocca un segreto, dì che si può scoprire in gioco. Non fare mosse, non far avanzare la scena, non chiamare conflitti. Massimo 60 parole.',
+ gm_respond:()=>'È il tuo turno di GM. Una sola mossa, massimo 50 parole, che lasci alla giocatrice il tempo di rispondere (niente eventi a catena, un solo PNG che parla alla volta). Reagisci a ciò che la trollbabe ha appena fatto o detto: descrivi ciò che si vede e le azioni e parole dei PNG (di parte, espliciti su ciò che vogliono). Applica il test dei Conflitti: se a un personaggio non sta bene che l’azione di lei vada come dichiara, o un gesto mette sotto stress il suo rapporto con gli Stakes, o un PNG agisce contro di lei, chiama il conflitto: "conflict" con type e pace (altrimenti null). Se lo chiami, fermati PRIMA dell’esito: descrivi solo l’istante dell’azione e la reazione del PNG, mai il risultato (niente «cade morto», «la scure lo colpisce»). Se la scena è a una pausa naturale o i personaggi hanno cambiato luogo, "end_scene": true. Se gli Stakes hanno raggiunto una condizione finale, "end_adventure": true. Se la trollbabe è incapacitata, chiudi la scena. Se la giocatrice ha deciso di lasciare il luogo, decidi se qualcuno cerca di fermarla (conflict) oppure "end_adventure": true. In "npcs" i nomi dei nuovi PNG con nome.'+askHelp()+objHelp(' In scena vale anche: azioni e parole dei PNG le decidi tu, non la giocatrice.'),
+ table_talk:()=>'Sei al tavolo, fuori dal gioco: la giocatrice ti parla da persona a persona (la sua domanda è nelle NOTE), non è la trollbabe che parla ai PNG. Rispondi come GM, in prima persona, senza narrare e senza far parlare i PNG. Chiarisci la fiction già stabilita (età, distanze, chi è presente, cosa si vede o si sente). Se ti fa notare un’incoerenza o un errore, riconoscilo e correggi la fiction in modo esplicito («Hai ragione: …»): la correzione vale da ora in poi. Puoi fissare piccoli dettagli coerenti come faresti al tavolo, ma non rivelare la preparazione segreta (Stakes, esiti, retroscena, segreti dei PNG): se la domanda tocca un segreto, dì che si può scoprire in gioco. Non fare mosse, non far avanzare la scena, non chiamare conflitti. Massimo 60 parole.'+tableTalkMore(),
  tb_act:()=>'È il tuo turno: dì o fai qualcosa di coerente con chi è la tua trollbabe e con ciò che sta succedendo. Se vuoi un conflitto (cioè agisci per ottenere qualcosa da qualcuno o contro qualcuno), compila "conflict" con type, pace e goal (null altrimenti). "leave": true solo se vuoi davvero lasciare il luogo. "ask_end": true se la scena ti sembra conclusa.',
  tb_request:()=>'La scena è finita. Dì dove vuoi andare o cosa vuoi fare nella prossima scena (una frase). "heal": true se sei ferita o incapacitata e vuoi che sia una scena di cura.',
  goal:()=>'Il GM ha dichiarato un conflitto '+TYPES[G.conflict.type].label+'. Dichiara il tuo Goal: un risultato attivo che coinvolge qualcun altro o qualcosa, detto in generale, non passivo e non troppo specifico.',
- fair_gm:()=>'Fair and clear: descrivi cosa fanno i PNG avversari all’inizio di questo conflitto e dichiara apertamente tutto ciò che si oppone alla trollbabe e può farle del male (avversari, ambiente, magia, anche ciò che finora era nascosto): ciò che non dici adesso non potrai introdurlo dopo. Descrivi cosa stanno facendo e cosa si oppone, non cosa succederà: niente esiti né conseguenze anticipate. Massimo 70 parole.'+fairTurn('gm'),
+ fair_gm:()=>'Fair and clear: descrivi cosa fanno i PNG avversari all’inizio di questo conflitto e dichiara apertamente tutto ciò che si oppone alla trollbabe e può farle del male (avversari, ambiente, magia, anche ciò che finora era nascosto): ciò che non dici adesso non potrai introdurlo dopo. Descrivi cosa stanno facendo e cosa si oppone, non cosa succederà: niente esiti né conseguenze anticipate. Massimo 70 parole.'+fairTurn('gm')+objHelp(),
  fair_tb:()=>'Fair and clear: descrivi cosa fa la tua trollbabe all’inizio di questo conflitto (azione di apertura, vivida). Non decidere l’esito. Massimo 50 parole.'+fairTurn('tb'),
+ review:()=>'Controlla soltanto le ultime frasi della giocatrice, nelle NOTE: sono narrazioni o azioni dentro un conflitto. Se rispettano le regole rispondi {"objection":null}; altrimenti {"objection":"il motivo in una frase, con la regola","of":numero della voce}. '+BREAKS+' Nel conflitto è lei a narrare i propri fallimenti, anche ciò che fanno gli avversari: non è una violazione. Lo è invece narrare un fallimento in cui il Goal avanza comunque.',
  step_gm:()=>{const c=G.conflict;return 'Serie '+c.series+' del conflitto (riuscite '+c.succ+', fallite '+c.fail+' su '+c.pace+'). Prima del tiro, descrivi in una frase la mossa degli avversari in questo passo, usando solo ciò che è stato dichiarato nel Fair and clear. Niente esiti: li decide il dado. "text" vuoto se nessuno agisce. Massimo 40 parole.';},
  step_tb:()=>{const c=G.conflict;return 'Serie '+c.series+' del conflitto (riuscite '+c.succ+', fallite '+c.fail+' su '+c.pace+'). '+(c.step&&c.step.gm?'Il GM: «'+c.step.gm+'». ':'')+'Prima del tiro, dì cosa fa la tua trollbabe in questo passo verso il Goal «'+c.goal+'»: un’azione concreta, che il tiro deciderà se le riesce. Niente esiti, niente informazioni nuove. Massimo 40 parole.';},
  narr_gm:()=>{const c=G.conflict;return c.kind==='success'&&!lastSeries(c,'success')?'Questa Serie è RIUSCITA, ma il conflitto non è finito (Serie riuscite '+(c.succ+1)+' su '+c.pace+' necessarie, fallite '+c.fail+'): il Goal NON è ancora raggiunto. Narra con una sola immagine come la trollbabe si avvicina al Goal in questo passo; avversari e ostacoli dichiarati restano in gioco. Niente nuove azioni di PNG né nuovi conflitti. Massimo 50 parole.':c.kind==='success'?'Il Goal della trollbabe è RIUSCITO. Narra il successo con una sola immagine forte, nello stile con cui la giocatrice l’ha giocata. Niente nuove azioni di PNG né nuovi conflitti. Massimo 50 parole.':'La trollbabe è INCAPACITATA (Goal fallito). Narra in modo ostile ma coerente (con il tipo di conflitto e con ciò che è accaduto) che cosa le succede e come finisce a terra o in balia degli avversari. Usa solo minacce e mezzi già dichiarati nel Fair and clear: niente nuove rivelazioni. Massimo 60 parole.';},
@@ -1411,11 +1465,23 @@ function fairTurn(s){
  return ' È di nuovo il tuo turno. '+who+' ha dichiarato: «'+f[o]+'». La tua dichiarazione attuale: «'+f[s]+'». Se resta coerente con la sua rispondi {"accept":true}; se va adattata, rispondi con "text" = la nuova versione completa.';
 }
 const FAIR_ROUNDS=6;
-const LIGHT=['goal','fair_gm','fair_tb','step_gm','step_tb','rel_offer','interim','tb_request','decide_tb'];
+const BREAKS='Eccepisci solo violazioni chiare delle regole: informazioni nuove (retroscena, poteri, personaggi o minacce mai stabiliti) oppure un Goal già fallito ritentato nella stessa scena. Mai su stile, colore, ambiente o presagi: la trollbabe che fallisce può dare la colpa all’ambiente.';
+function tableTalkMore(){
+ const o=G.objection,e=o&&LOG.find(x=>x._id===o.of);
+ return ' Le voci del diario hanno un numero (#n). Se correggi un fatto narrato da te, oltre a dirlo nel "text" metti in "amend" {"of":n,"text":"la voce #n riscritta per intero"}: solo voci del GM o di scena, e solo dettagli minori.'+
+  (o?' C’è una tua eccezione aperta sulla voce #'+(e?e.n:'?')+': «'+o.why+'». Se la spiegazione della giocatrice ti convince, metti "withdraw": true; altrimenti dille cosa rettificare.':'');
+}
+const objHelp=more=>G.seats.tb.kind!=='human'?'':' Se l’ultima mossa della giocatrice viola le regole, invece di rispondere metti in "objection" il motivo in una frase, con la regola, e lascia "text" vuoto. '+BREAKS+(more||'');
+const byN=n=>LOG.find(e=>e.n===parseInt(n,10));
+async function raiseObjection(why,of,seq){
+ await A.ooc('gm',why,{chat:1,objection:1});
+ await tx(g=>{g.review=null;g.objection={of:of,why:why};},seq);
+}
+const LIGHT=['review','goal','fair_gm','fair_tb','step_gm','step_tb','rel_offer','interim','tb_request','decide_tb'];
 const tierFor=t=>(AI.tier==='default'&&LIGHT.indexOf(t)>=0)?'quick':AI.tier;
 async function callAI(role,task,schema,extra,own){
  const ch=role==='gm'?chatText():'';
- const prompt=[role==='gm'?GM_RULES:TB_RULES,'=== STATO ===\n'+stateText(role,task==='gm_prep'),'=== DIARIO RECENTE ===\n'+logText(),ch?'=== CHIARIMENTI FUORI GIOCO (accordi sulla fiction: valgono) ===\n'+ch:'',extra?'=== NOTE ===\n'+extra:'','=== COMPITO ['+task+'] ===\n'+TASKS[task](),'Rispondi SOLO con un oggetto JSON, senza altro testo, di questa forma:\n'+schema].filter(Boolean).join('\n\n');
+ const prompt=[role==='gm'?GM_RULES:TB_RULES,'=== STATO ===\n'+stateText(role,task==='gm_prep'),'=== DIARIO RECENTE ===\n'+logText(task==='table_talk'||task==='review'),ch?'=== CHIARIMENTI FUORI GIOCO (accordi sulla fiction: valgono) ===\n'+ch:'',extra?'=== NOTE ===\n'+extra:'','=== COMPITO ['+task+'] ===\n'+TASKS[task](),'Rispondi SOLO con un oggetto JSON, senza altro testo, di questa forma:\n'+schema].filter(Boolean).join('\n\n');
  // la chat ha un proprio controller: «Ferma» e la pausa riguardano solo il gioco
  const ctl=new AbortController();if(!own)AI.ctl=ctl;
  try{return await sample.json(prompt,{modelTier:tierFor(task),signal:ctl.signal,cache:false});}
@@ -1425,9 +1491,12 @@ async function answerChat(text,re){
  const q=re&&LOG.find(e=>e._id===re);
  AI.chatBusy=true;AI.chatErr=null;AI.chatPending=null;render();
  try{
-  const r=await callAI('gm','table_talk','{"text":"…"}','Domanda della giocatrice: «'+text+'»'+(q?'\nSi riferisce a questo passaggio: «'+q.text+'»':''),true);
+  const r=await callAI('gm','table_talk','{"text":"…","amend":null,"withdraw":false}','Domanda della giocatrice: «'+text+'»'+(q?'\nSi riferisce a questo passaggio: «'+textOf(q)+'»':''),true);
   const t=str(r.text,900);if(!t)throw {code:'empty_completion'};
   await A.ooc('gm',t,{chat:1});
+  const a=r.amend,e=a&&byN(a.of),at=a&&str(a.text,1400);
+  if(e&&at&&e.who==='gm')await A.amend('gm',e._id,at);
+  if(r.withdraw===true&&G.objection)await A.objectionClose();
  }catch(e){AI.chatErr=aiErrText(e);AI.chatPending={text:text,re:re};console.error(e);}
  finally{AI.chatBusy=false;render();}
 }
@@ -1454,10 +1523,12 @@ function pickItem(x){
  return (items.find(i=>i.id===s)||items.find(i=>i.label.toLowerCase().indexOf(s.toLowerCase())===0&&s)||items[0]).id;
 }
 async function fairJob(s,seq){
- const f=G.conflict.fair;
+ const f=G.conflict.fair,obj=s==='gm'&&G.seats.tb.kind==='human';
  if(f[s]&&f.round>=FAIR_ROUNDS){fresh(seq);await A.fairOk(s);return;}
- const r=await callAI(s,'fair_'+s,f[s]?'{"accept":true} oppure {"text":"…"}':'{"text":"…"}');fresh(seq);
- const t=str(r.text,700);
+ const r=await callAI(s,'fair_'+s,(f[s]?'{"accept":true} oppure {"text":"…"}':'{"text":"…"}')+(obj?'\nCon un’eccezione aggiungi "objection":"…"':''));fresh(seq);
+ const t=str(r.text,700),ob=obj&&str(r.objection,400);
+ // un’eccezione nel Fair and clear passa la mano alla trollbabe perché modifichi la sua dichiarazione
+ if(ob&&(t||f[s])){await A.ooc('gm',ob,{chat:1,objection:1});await A.fairSay(s,t||f[s]);return;}
  if(f[s]&&(r.accept===true||!t||t===f[s])){await A.fairOk(s);return;}
  if(!t)throw {code:'empty_completion'};
  await A.fairSay(s,t);
@@ -1480,8 +1551,10 @@ const J={
   await A.openScene(t,Array.isArray(r.npcs)?r.npcs:[],!!r.heal);
  }},
  gmRespond:{label:'Il GM sta rispondendo…',async run(seq){
-  const r=await callAI('gm','gm_respond','{"text":"…","npcs":["…"],"conflict":null,"end_scene":false,"end_adventure":false,"ask":null}\nSe chiami un conflitto: "conflict":{"type":"fighting|magic|social","pace":2}');
+  const r=await callAI('gm','gm_respond','{"text":"…","npcs":["…"],"conflict":null,"end_scene":false,"end_adventure":false,"ask":null,"objection":null}\nSe chiami un conflitto: "conflict":{"type":"fighting|magic|social","pace":2}');
   fresh(seq);
+  const ob=G.seats.tb.kind==='human'&&str(r.objection,400),last=LOG.filter(e=>e.type==='tb').pop();
+  if(ob&&last){await raiseObjection(ob,last._id,seq);return;}
   const q=str(r.ask,400);
   if(q&&!(G.ask&&G.ask.at===G.logN)){
    await A.ooc('gm',q,{chat:1,ask:1});
@@ -1523,6 +1596,15 @@ const J={
  paceKeep:{label:'…',async run(seq){fresh(seq);await A.paceAdj('keep');}},
  fairGM:{label:'Il GM descrive gli avversari…',run:seq=>fairJob('gm',seq)},
  fairTB:{label:'La trollbabe apre il conflitto…',run:seq=>fairJob('tb',seq)},
+ review:{label:'Il GM legge…',async run(seq){
+  const from=G.review.from,t0=Date.now();
+  while(!LOG.some(e=>e.n>=from)&&Date.now()-t0<3000)await sleep(50);
+  const own=LOG.filter(e=>e.type==='tb'&&e.n>=from);
+  const r=await callAI('gm','review','{"objection":null}',own.map(e=>'#'+e.n+' '+e.text).join('\n'));fresh(seq);
+  const ob=str(r.objection,400),e=(r.of&&byN(r.of))||own[own.length-1];
+  if(ob&&e){await raiseObjection(ob,e._id,seq);return;}
+  await tx(g=>{g.review=null;},seq);
+ }},
  stepGM:{label:'Il GM muove gli avversari…',async run(seq){
   const r=await callAI('gm','step_gm','{"text":"…"}');fresh(seq);
   await A.stepSay('gm',str(r.text,500));
@@ -1570,6 +1652,8 @@ const J={
 };
 function nextAIJob(){
  const g=G,c=g.conflict;
+ if(g.review)return aiSeat('gm')?J.review:null;
+ if(g.objection)return null;
  switch(g.step){
   case 'tb_create':return aiSeat('tb')?J.pcCreate:null;
   case 'gm_prep':return aiSeat('gm')?J.gmPrep:null;

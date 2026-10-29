@@ -2,10 +2,11 @@ const {makeStore,makeClient,sleep}=require('./harness');
 const assert=require('assert');
 const eq=(a,b,m)=>assert.strictEqual(a,b,m+' (atteso '+b+', trovato '+a+')');
 const waitFor=async(c,ms)=>{const t0=Date.now();while(Date.now()-t0<(ms||6000)){if(c())return true;await sleep(40);}throw new Error('timeout: '+c);};
+const rollWait=async T=>{const t=Date.now()+3000;while((T.G.review||T.G.objection)&&Date.now()<t)await sleep(20);};
 (async()=>{
   const store=makeStore();
-  const ai={gm_prep:()=>({where:'w',who:'h',stakes:'S',a:'a',b:'b',characters:[],notes:''}),scene_open:()=>({text:'Scena.',npcs:[],heal:true}),gm_respond:()=>({text:'ok'}),fair_gm:()=>({text:'Il canto sale.'}),narr_gm:()=>({text:'ok'})};
-  const w=makeClient(store,'uA',{ai});await sleep(120);const T=w.__TB;
+  const ai={gm_prep:()=>({where:'w',who:'h',stakes:'S',a:'a',b:'b',characters:[],notes:''}),scene_open:()=>({text:'Scena.',npcs:[],heal:true}),gm_respond:()=>({text:'ok'}),fair_gm:()=>({text:'Il canto sale.'}),narr_gm:()=>({text:'ok'}),review:()=>({objection:null})};
+  const w=makeClient(store,'uA',{ai});await sleep(120);const T=w.__TB;const roll=async v=>{await rollWait(T);return T.A.roll(v);};
   T.D.n_name='S';T.D.n_role='tb';T.D.n_other='ai';await T.ACT.newGame();await sleep(150);
   Object.assign(T.D,{pc_name:'Gwenna',pc_num:'6',pc_magic:'troll',pc_fight:'missile',pc_social:'fun',pc_loc:'9'});await T.ACT.createPC();await sleep(1500);
   // conflitto Magic: due fallimenti → ferita descritta
@@ -15,9 +16,9 @@ const waitFor=async(c,ms)=>{const t0=Date.now();while(Date.now()-t0<(ms||6000)){
   await waitFor(()=>T.G.conflict.fair.gm&&T.G.conflict.fair.gmOk);
   await T.A.fairOk('tb');
   await waitFor(()=>T.G.conflict.stage==='roll');
-  await T.A.roll(1);await waitFor(()=>T.G.conflict.stage==='narr_tb');
+  await roll(1);await waitFor(()=>T.G.conflict.stage==='narr_tb');
   await T.A.narrTB('Il fiato le manca.',{item:'carried'});await waitFor(()=>T.G.conflict.stage==='roll');
-  await T.A.roll(1);await waitFor(()=>T.G.conflict.kind==='injury');
+  await roll(1);await waitFor(()=>T.G.conflict.kind==='injury');
   await T.A.narrTB('Gli spiriti la rimbalzano: sangue dal naso e vista offuscata.',null);await sleep(200);
   eq(T.G.pc.status,'injured','ferita');
   assert.ok(T.G.pc.hurt&&T.G.pc.hurt.indexOf('spiriti')>=0,'descrizione della ferita non salvata');

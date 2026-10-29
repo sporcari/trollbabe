@@ -3,7 +3,7 @@ const rnd=()=>1+Math.floor(Math.random()*10);
 
 async function tbBot(w,b){
   const T=w.__TB,G=T.G;
-  if(!G||T.ROLE!=='tb')return false;
+  if(!G||T.ROLE!=='tb'||G.review||G.objection)return false;
   const D=T.D,ACT=T.ACT,doc=w.document;
   const has=a=>!!doc.querySelector('#dock [data-act="'+a+'"]');
   const need=a=>{if(!has(a))throw new Error('Nel dock manca il pulsante '+a+' @ '+G.step+(G.conflict?'/'+G.conflict.stage+(G.conflict.kind?'/'+G.conflict.kind:''):''));};
