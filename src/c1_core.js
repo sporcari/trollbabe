@@ -54,9 +54,16 @@ function relCost(outcome,pcStatus){
   if(outcome==='success')return pcStatus==='injured'?'ok':'injured';
   return pcStatus==='incap'?'injured':(pcStatus==='injured'?'killed':'injured');
 }
+// gli alleati valgono come roll-again solo se sono in scena; avversari e amanti sono sempre nei paraggi
+const relHere=r=>r.type!=='ally'||!!r.always||!!r.here;
+// un nome conta come «con nome» se contiene, come parola intera, il nome di un PNG già nominato
+function namedIn(g,name){
+  const s=String(name||'').toLowerCase(),esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return (g.npcs||[]).some(n=>new RegExp('(^|[^\\p{L}])'+esc(n.name.toLowerCase())+'($|[^\\p{L}])','u').test(s));
+}
 function availableItems(g){
   const out=Object.entries(ITEMS).filter(([k])=>!(g.checked||[]).includes(k)).map(([k,l])=>({id:k,label:l}));
-  (g.rels||[]).filter(r=>!r.dead&&!r.checked).forEach(r=>out.push({id:'rel:'+r.id,label:r.name+' ('+REL_TYPES[r.type].toLowerCase()+')'}));
+  (g.rels||[]).filter(r=>!r.dead&&!r.checked&&relHere(r)).forEach(r=>out.push({id:'rel:'+r.id,label:r.name+' ('+REL_TYPES[r.type].toLowerCase()+')'}));
   return out;
 }
 
@@ -197,7 +204,7 @@ function startSeries(g,push){
   c.stage='roll';c.box=startBox(g);c.sb=c.box;c.roll=null;
 }
 function addRel(g,o){
-  g.rels.push({id:'r'+rid(5),name:o.name,type:o.type,note:o.note||'',checked:false,status:'ok'});
+  g.rels.push({id:'r'+rid(5),name:o.name,type:o.type,note:o.note||'',checked:false,status:'ok',here:true});
 }
 
 const A={
@@ -214,6 +221,7 @@ const A={
   g.scene=(g.scene||0)+1;
   if(g.request&&g.request.heal&&heal&&g.pc.status!=='dead'){g.pc.status='ok';g.pc.hurt=null;push('sys','','Scena di cura: ferite e incapacità guarite.');}
   g.request=null;addNpcs(g,npcs);
+  (g.rels||[]).forEach(r=>{if(!r.always)r.here=false;});
   push('scene','gm',text,{scene:g.scene,loc:g.locName});
   g.step='scene_play';g.turn='tb';
  });},
@@ -362,7 +370,7 @@ const A={
  relPropose(o){return tx((g,push)=>{
   if(g.step!=='rel_offer')return false;
   if(o.text)push('tb','tb',o.text,{kind:'rel'});
-  const named=g.npcs.some(n=>n.name.toLowerCase()===o.name.toLowerCase());
+  const named=namedIn(g,o.name);
   if(!named){addRel(g,o);push('sys','','Nuova Relationship: '+o.name+' ('+REL_TYPES[o.type].toLowerCase()+').');g.step='scene_play';}
   else{g.relProposal={name:o.name,type:o.type,note:o.note||''};g.step='rel_approve';push('sys','',pcName(g)+' propone una Relationship con '+o.name+' (personaggio con nome: decide il GM).');}
  });},
@@ -373,6 +381,18 @@ const A={
   else push('sys','','Il GM pone il veto: per ora '+p.name+' non diventa una Relationship.',{kind:'veto'});
   g.relResult={id:rid(4),name:p.name,ok:!!ok,type:p.type};
   g.relProposal=null;g.step='scene_play';
+ });},
+ relRename(id,name){return tx((g,push)=>{
+  const r=(g.rels||[]).find(x=>x.id===id),n=String(name||'').trim().slice(0,60);
+  if(!r||!n||n===r.name)return false;
+  if(!r.note)r.note=r.name;
+  push('sys','',r.name+' ora si chiama '+n+'.');
+  r.name=n;addNpcs(g,[n]);
+ });},
+ relPresence(id,o){return tx(g=>{
+  const r=(g.rels||[]).find(x=>x.id===id);if(!r||r.type!=='ally')return false;
+  if('here' in o)r.here=!!o.here;
+  if('always' in o){r.always=!!o.always;if(r.always)r.here=true;}
  });},
  relBreak(id){return tx((g,push)=>{
   const r=g.rels.find(x=>x.id===id);if(!r)return false;

@@ -198,7 +198,7 @@ body.chaton .e .q{display:inline-block}
 .imp{font-family:var(--sans);font-weight:700;font-size:.9rem;margin:.4rem 0 .2rem}
 .app{font-size:.95rem;margin:.2rem 0;color:var(--ink2)}
 .rr{list-style:none;margin:0;padding:0;font-family:var(--sans);font-size:.9rem}
-.rr li{padding:.1rem 0}.rr li.used{text-decoration:line-through;color:var(--ink2)}.rr li small{color:var(--ink2)}
+.rr li{padding:.1rem 0}.rr li.away{color:var(--ink2)}.rr li .row{margin-top:.2rem}.rr li.used{text-decoration:line-through;color:var(--ink2)}.rr li small{color:var(--ink2)}
 .card.secret{border-style:dashed}
 .card.secret p{margin:.3rem 0;font-size:.95rem}
 .rules h4{font-family:var(--sans);font-size:.88rem;margin:.7rem 0 .1rem}.rules h4:first-child{margin-top:0}
@@ -311,9 +311,16 @@ function relCost(outcome,pcStatus){
   if(outcome==='success')return pcStatus==='injured'?'ok':'injured';
   return pcStatus==='incap'?'injured':(pcStatus==='injured'?'killed':'injured');
 }
+// gli alleati valgono come roll-again solo se sono in scena; avversari e amanti sono sempre nei paraggi
+const relHere=r=>r.type!=='ally'||!!r.always||!!r.here;
+// un nome conta come «con nome» se contiene, come parola intera, il nome di un PNG già nominato
+function namedIn(g,name){
+  const s=String(name||'').toLowerCase(),esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return (g.npcs||[]).some(n=>new RegExp('(^|[^\\p{L}])'+esc(n.name.toLowerCase())+'($|[^\\p{L}])','u').test(s));
+}
 function availableItems(g){
   const out=Object.entries(ITEMS).filter(([k])=>!(g.checked||[]).includes(k)).map(([k,l])=>({id:k,label:l}));
-  (g.rels||[]).filter(r=>!r.dead&&!r.checked).forEach(r=>out.push({id:'rel:'+r.id,label:r.name+' ('+REL_TYPES[r.type].toLowerCase()+')'}));
+  (g.rels||[]).filter(r=>!r.dead&&!r.checked&&relHere(r)).forEach(r=>out.push({id:'rel:'+r.id,label:r.name+' ('+REL_TYPES[r.type].toLowerCase()+')'}));
   return out;
 }
 
@@ -454,7 +461,7 @@ function startSeries(g,push){
   c.stage='roll';c.box=startBox(g);c.sb=c.box;c.roll=null;
 }
 function addRel(g,o){
-  g.rels.push({id:'r'+rid(5),name:o.name,type:o.type,note:o.note||'',checked:false,status:'ok'});
+  g.rels.push({id:'r'+rid(5),name:o.name,type:o.type,note:o.note||'',checked:false,status:'ok',here:true});
 }
 
 const A={
@@ -471,6 +478,7 @@ const A={
   g.scene=(g.scene||0)+1;
   if(g.request&&g.request.heal&&heal&&g.pc.status!=='dead'){g.pc.status='ok';g.pc.hurt=null;push('sys','','Scena di cura: ferite e incapacità guarite.');}
   g.request=null;addNpcs(g,npcs);
+  (g.rels||[]).forEach(r=>{if(!r.always)r.here=false;});
   push('scene','gm',text,{scene:g.scene,loc:g.locName});
   g.step='scene_play';g.turn='tb';
  });},
@@ -619,7 +627,7 @@ const A={
  relPropose(o){return tx((g,push)=>{
   if(g.step!=='rel_offer')return false;
   if(o.text)push('tb','tb',o.text,{kind:'rel'});
-  const named=g.npcs.some(n=>n.name.toLowerCase()===o.name.toLowerCase());
+  const named=namedIn(g,o.name);
   if(!named){addRel(g,o);push('sys','','Nuova Relationship: '+o.name+' ('+REL_TYPES[o.type].toLowerCase()+').');g.step='scene_play';}
   else{g.relProposal={name:o.name,type:o.type,note:o.note||''};g.step='rel_approve';push('sys','',pcName(g)+' propone una Relationship con '+o.name+' (personaggio con nome: decide il GM).');}
  });},
@@ -630,6 +638,18 @@ const A={
   else push('sys','','Il GM pone il veto: per ora '+p.name+' non diventa una Relationship.',{kind:'veto'});
   g.relResult={id:rid(4),name:p.name,ok:!!ok,type:p.type};
   g.relProposal=null;g.step='scene_play';
+ });},
+ relRename(id,name){return tx((g,push)=>{
+  const r=(g.rels||[]).find(x=>x.id===id),n=String(name||'').trim().slice(0,60);
+  if(!r||!n||n===r.name)return false;
+  if(!r.note)r.note=r.name;
+  push('sys','',r.name+' ora si chiama '+n+'.');
+  r.name=n;addNpcs(g,[n]);
+ });},
+ relPresence(id,o){return tx(g=>{
+  const r=(g.rels||[]).find(x=>x.id===id);if(!r||r.type!=='ally')return false;
+  if('here' in o)r.here=!!o.here;
+  if('always' in o){r.always=!!o.always;if(r.always)r.here=true;}
  });},
  relBreak(id){return tx((g,push)=>{
   const r=g.rels.find(x=>x.id===id);if(!r)return false;
@@ -910,6 +930,15 @@ function trackerHTML(){
 }
 
 /* ================= pannello laterale ================= */
+function relLI(r){
+ const mine=ROLE==='tb'&&G.seats.tb.kind==='human',ally=r.type==='ally';
+ const where=ally?(r.always?'l’accompagna sempre':r.here?'in scena':'fuori scena'):'sempre nei paraggi';
+ return '<li class="rel '+(r.checked?'used':'')+(relHere(r)?'':' away')+'">'+esc(r.name)+' <small>'+REL_TYPES[r.type].toLowerCase()+(r.status==='injured'?', ferito':'')+' · '+where+'</small>'+
+  (r.note&&r.note!==r.name?'<br><small>'+esc(r.note)+'</small>':'')+
+  (mine?'<div class="row">'+btn('Rinomina','relRenameOpen','sm ghost','data-id="'+r.id+'"')+
+   (ally&&!r.always?btn(r.here?'Esce di scena':'È in scena','relHereToggle','sm ghost','data-id="'+r.id+'"'):'')+
+   (ally?btn(r.always?'Non sempre con lei':'L’accompagna sempre','relAlwaysToggle','sm ghost','data-id="'+r.id+'"'):'')+'</div>':'')+'</li>';
+}
 function sideHTML(){
  const g=G;
  if(ui.tab==='rules')return rulesHTML();
@@ -926,7 +955,7 @@ function sideHTML(){
    '<p class="app">Porta con sé: '+esc(pc.hum)+'; '+esc(pc.troll)+'.</p></div>';
   h+='<div class="card slim"><div class="k">Roll-again in questa avventura</div><ul class="rr">'+
    Object.keys(ITEMS).map(k=>'<li class="'+(g.checked.includes(k)?'used':'')+'">'+ITEMS[k]+'</li>').join('')+
-   g.rels.filter(r=>!r.dead).map(r=>'<li class="rel '+(r.checked?'used':'')+'">'+esc(r.name)+' <small>'+REL_TYPES[r.type].toLowerCase()+(r.status==='injured'?', ferito':'')+'</small></li>').join('')+'</ul></div>';
+   g.rels.filter(r=>!r.dead).map(relLI).join('')+'</ul></div>';
  }else h+='<div class="card slim"><p class="muted">La trollbabe non è ancora stata creata.</p></div>';
  if(g.npcs&&g.npcs.length)h+='<div class="card slim"><div class="k">PNG con nome</div><p>'+g.npcs.map(n=>esc(n.name)).join(', ')+'</p></div>';
  if(ROLE==='gm'&&PRIV&&G.step!=='gm_prep')h+='<div class="card secret"><div class="k">Preparazione segreta</div>'+
@@ -994,6 +1023,7 @@ function dockHTML(){
  if(!ROLE)return '<p class="muted">Stai guardando questa partita senza un posto al tavolo.</p>';
  if(!g.pc&&g.step!=='lobby'&&g.step!=='tb_create')return '<div class="wait"><span class="dot"></span><span>Sincronizzazione in corso…</span></div>';
  if(ui.amending)return amendHTML();
+ if(ui.renaming)return renameHTML();
  if(g.objection&&ROLE==='tb')return objectionHTML()+oocHTML();
  let h='';
  switch(g.step){
@@ -1016,6 +1046,12 @@ function amendHTML(){
  if(!e){ui.amending=null;return '';}
  return '<div class="form"><h3>Emenda</h3><p class="hint">La nuova versione prende il posto di questa nel diario; quella di prima resta consultabile. Vale da ora in poi.</p>'+
   fld('am_text','Nuova versione',{rows:4,def:textOf(e)})+'<div class="row">'+btn('Salva la correzione','amendSave','primary')+btn('Annulla','amendCancel','ghost')+'</div></div>';
+}
+function renameHTML(){
+ const r=(G.rels||[]).find(x=>x.id===ui.renaming);
+ if(!r){ui.renaming=null;return '';}
+ return '<div class="form"><h3>Dai un nome a '+esc(r.name)+'</h3><p class="hint">Il nome vale da ora in poi, anche nella lista dei roll-again; la descrizione di partenza resta come nota.</p>'+
+  fld('rn_name','Nome',{max:60,def:r.name})+'<div class="row">'+btn('Salva il nome','relRenameSave','primary')+btn('Annulla','relRenameCancel','ghost')+'</div></div>';
 }
 function objectionHTML(){
  const o=G.objection,e=LOG.find(x=>x._id===o.of);
@@ -1230,6 +1266,15 @@ const ACT={
  chatOpen(){ui.tab='chat';document.body.classList.add('drawer');lastSideKey='';render();const n=$('[data-d="chat"]');if(n)n.focus();},
  chatRe(el){D.chat_re=el.dataset.id;ACT.chatOpen();},
  chatReClear(){clear('chat_re');lastSideKey='';render();},
+ relRenameOpen(el){ui.renaming=el.dataset.id;delete D.rn_name;ui.rev++;render();},
+ relRenameCancel(){ui.renaming=null;clear('rn_name');ui.rev++;render();},
+ async relRenameSave(){
+  const n=v('rn_name');if(!n)throw 'Scrivi il nome.';
+  if(!await A.relRename(ui.renaming,n))throw 'Il nome non è cambiato.';
+  ui.renaming=null;clear('rn_name');ui.rev++;render();
+ },
+ async relHereToggle(el){const r=G.rels.find(x=>x.id===el.dataset.id);if(r)await A.relPresence(r.id,{here:!r.here});},
+ async relAlwaysToggle(el){const r=G.rels.find(x=>x.id===el.dataset.id);if(r)await A.relPresence(r.id,{always:!r.always});},
  amendOpen(el){ui.amending=el.dataset.id;delete D.am_text;ui.rev++;render();},
  amendCancel(){ui.amending=null;clear('am_text');ui.rev++;render();},
  async amendSave(){
@@ -1403,7 +1448,7 @@ function stateText(role,noSecret){
   L.push('Trollbabe: '+pc.name+', numero '+pc.number+' (Fighting '+rangeText(r.fighting)+', Magic '+rangeText(r.magic)+', Social '+rangeText(r.social)+'). Impressioni: '+IMP_FIGHT[pc.fight]+', '+IMP_MAGIC[pc.magic]+', '+IMP_SOCIAL[pc.social]+'. Capelli: '+pc.hair+'. Corna: '+pc.horns+'. Abiti: '+pc.cloth+'. Equipaggiamento: '+pc.kit+'. Oggetto umano: '+pc.hum+'. Oggetto troll: '+pc.troll+'. Stato: '+STATUS[pc.status]+(pc.hurt?' ('+pc.hurt+')':'')+'.');
  }
  const rels=(g.rels||[]).filter(r=>!r.dead);
- if(rels.length)L.push('Relationship: '+rels.map(r=>r.name+' ('+REL_TYPES[r.type].toLowerCase()+(r.checked?', già usato in questa avventura':'')+(r.status==='injured'?', ferito':'')+')').join('; ')+'.');
+ if(rels.length)L.push('Relationship: '+rels.map(r=>r.name+' ('+REL_TYPES[r.type].toLowerCase()+(r.checked?', già usato in questa avventura':'')+(r.status==='injured'?', ferito':'')+(r.type==='ally'?(relHere(r)?', in scena':', fuori scena'):'')+(r.note&&r.note!==r.name?', «'+r.note+'»':'')+')').join('; ')+'.');
  L.push('Roll-again standard già spuntati in questa avventura: '+((g.checked||[]).map(k=>ITEMS[k]).join(', ')||'nessuno')+'.');
  if(g.npcs&&g.npcs.length)L.push('PNG con nome finora: '+g.npcs.map(n=>n.name).join(', ')+'.');
  if(g.request)L.push('Richiesta di scena della giocatrice: '+(g.request.text||'(lascia scegliere al GM)')+(g.request.heal?' — è una scena di cura.':'.'));
@@ -1447,7 +1492,7 @@ const TASKS={
  goal:()=>'Il GM ha dichiarato un conflitto '+TYPES[G.conflict.type].label+'. Dichiara il tuo Goal: un risultato attivo che coinvolge qualcun altro o qualcosa, detto in generale, non passivo e non troppo specifico.',
  fair_gm:()=>'Fair and clear: descrivi cosa fanno i PNG avversari all’inizio di questo conflitto e dichiara apertamente tutto ciò che si oppone alla trollbabe e può farle del male (avversari, ambiente, magia, anche ciò che finora era nascosto): ciò che non dici adesso non potrai introdurlo dopo. Descrivi cosa stanno facendo e cosa si oppone, non cosa succederà: niente esiti né conseguenze anticipate. Massimo 70 parole.'+fairTurn('gm')+objHelp(),
  fair_tb:()=>'Fair and clear: descrivi cosa fa la tua trollbabe all’inizio di questo conflitto (azione di apertura, vivida). Non decidere l’esito. Massimo 50 parole.'+fairTurn('tb'),
- review:()=>'Controlla soltanto le ultime frasi della giocatrice, nelle NOTE: sono narrazioni o azioni dentro un conflitto. Se rispettano le regole rispondi {"objection":null}; altrimenti {"objection":"il motivo in una frase, con la regola","of":numero della voce}. '+BREAKS+' Nel conflitto è lei a narrare i propri fallimenti, anche ciò che fanno gli avversari: non è una violazione. Lo è invece narrare un fallimento in cui il Goal avanza comunque.',
+ review:()=>'Controlla soltanto le ultime frasi della giocatrice, nelle NOTE: sono narrazioni o azioni dentro un conflitto. Se rispettano le regole rispondi {"objection":null}; altrimenti {"objection":"il motivo in una frase, con la regola","of":numero della voce}. '+BREAKS+' Nel conflitto è lei a narrare i propri fallimenti, anche ciò che fanno gli avversari: non è una violazione. Lo è invece narrare un fallimento in cui il Goal avanza comunque. Puoi eccepire anche quando un roll-again «alleato improvviso» usa un PNG con nome (vedi lo STATO) e non vuoi concederlo, oppure quando usa un alleato che non può trovarsi lì.',
  step_gm:()=>{const c=G.conflict;return 'Serie '+c.series+' del conflitto (riuscite '+c.succ+', fallite '+c.fail+' su '+c.pace+'). Prima del tiro, descrivi in una frase la mossa degli avversari in questo passo, usando solo ciò che è stato dichiarato nel Fair and clear. Niente esiti: li decide il dado. "text" vuoto se nessuno agisce. Massimo 40 parole.';},
  step_tb:()=>{const c=G.conflict;return 'Serie '+c.series+' del conflitto (riuscite '+c.succ+', fallite '+c.fail+' su '+c.pace+'). '+(c.step&&c.step.gm?'Il GM: «'+c.step.gm+'». ':'')+'Prima del tiro, dì cosa fa la tua trollbabe in questo passo verso il Goal «'+c.goal+'»: un’azione concreta, che il tiro deciderà se le riesce. Niente esiti, niente informazioni nuove. Massimo 40 parole.';},
  narr_gm:()=>{const c=G.conflict;return c.kind==='success'&&!lastSeries(c,'success')?'Questa Serie è RIUSCITA, ma il conflitto non è finito (Serie riuscite '+(c.succ+1)+' su '+c.pace+' necessarie, fallite '+c.fail+'): il Goal NON è ancora raggiunto. Narra con una sola immagine come la trollbabe si avvicina al Goal in questo passo; avversari e ostacoli dichiarati restano in gioco. Niente nuove azioni di PNG né nuovi conflitti. Massimo 50 parole.':c.kind==='success'?'Il Goal della trollbabe è RIUSCITO. Narra il successo con una sola immagine forte, nello stile con cui la giocatrice l’ha giocata. Niente nuove azioni di PNG né nuovi conflitti. Massimo 50 parole.':'La trollbabe è INCAPACITATA (Goal fallito). Narra in modo ostile ma coerente (con il tipo di conflitto e con ciò che è accaduto) che cosa le succede e come finisce a terra o in balia degli avversari. Usa solo minacce e mezzi già dichiarati nel Fair and clear: niente nuove rivelazioni. Massimo 60 parole.';},
@@ -1730,7 +1775,7 @@ async function boot(){
  UID=id||localId();
  showStart();
 }
-if(window.__TB_TEST__){window.__TB={A:A,ACT:ACT,D:D,get G(){return G;},get LOG(){return LOG;},get AI(){return AI;},get PRIV(){return PRIV;},get ROLE(){return ROLE;},ranges:ranges,rollOk:rollOk,relCost:relCost,lastSeries:lastSeries,expected:expected,availableItems:availableItems,nextAIJob:nextAIJob,aiTick:aiTick,askOpen:askOpen,ui:ui,openGame:openGame,showStart:showStart,TASKS:TASKS};}
+if(window.__TB_TEST__){window.__TB={A:A,ACT:ACT,D:D,get G(){return G;},get LOG(){return LOG;},get AI(){return AI;},get PRIV(){return PRIV;},get ROLE(){return ROLE;},ranges:ranges,rollOk:rollOk,relCost:relCost,lastSeries:lastSeries,namedIn:namedIn,stateText:stateText,render:render,expected:expected,availableItems:availableItems,nextAIJob:nextAIJob,aiTick:aiTick,askOpen:askOpen,ui:ui,openGame:openGame,showStart:showStart,TASKS:TASKS};}
 boot();
 })();
 

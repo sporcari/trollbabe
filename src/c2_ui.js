@@ -251,6 +251,15 @@ function trackerHTML(){
 }
 
 /* ================= pannello laterale ================= */
+function relLI(r){
+ const mine=ROLE==='tb'&&G.seats.tb.kind==='human',ally=r.type==='ally';
+ const where=ally?(r.always?'l’accompagna sempre':r.here?'in scena':'fuori scena'):'sempre nei paraggi';
+ return '<li class="rel '+(r.checked?'used':'')+(relHere(r)?'':' away')+'">'+esc(r.name)+' <small>'+REL_TYPES[r.type].toLowerCase()+(r.status==='injured'?', ferito':'')+' · '+where+'</small>'+
+  (r.note&&r.note!==r.name?'<br><small>'+esc(r.note)+'</small>':'')+
+  (mine?'<div class="row">'+btn('Rinomina','relRenameOpen','sm ghost','data-id="'+r.id+'"')+
+   (ally&&!r.always?btn(r.here?'Esce di scena':'È in scena','relHereToggle','sm ghost','data-id="'+r.id+'"'):'')+
+   (ally?btn(r.always?'Non sempre con lei':'L’accompagna sempre','relAlwaysToggle','sm ghost','data-id="'+r.id+'"'):'')+'</div>':'')+'</li>';
+}
 function sideHTML(){
  const g=G;
  if(ui.tab==='rules')return rulesHTML();
@@ -267,7 +276,7 @@ function sideHTML(){
    '<p class="app">Porta con sé: '+esc(pc.hum)+'; '+esc(pc.troll)+'.</p></div>';
   h+='<div class="card slim"><div class="k">Roll-again in questa avventura</div><ul class="rr">'+
    Object.keys(ITEMS).map(k=>'<li class="'+(g.checked.includes(k)?'used':'')+'">'+ITEMS[k]+'</li>').join('')+
-   g.rels.filter(r=>!r.dead).map(r=>'<li class="rel '+(r.checked?'used':'')+'">'+esc(r.name)+' <small>'+REL_TYPES[r.type].toLowerCase()+(r.status==='injured'?', ferito':'')+'</small></li>').join('')+'</ul></div>';
+   g.rels.filter(r=>!r.dead).map(relLI).join('')+'</ul></div>';
  }else h+='<div class="card slim"><p class="muted">La trollbabe non è ancora stata creata.</p></div>';
  if(g.npcs&&g.npcs.length)h+='<div class="card slim"><div class="k">PNG con nome</div><p>'+g.npcs.map(n=>esc(n.name)).join(', ')+'</p></div>';
  if(ROLE==='gm'&&PRIV&&G.step!=='gm_prep')h+='<div class="card secret"><div class="k">Preparazione segreta</div>'+
@@ -335,6 +344,7 @@ function dockHTML(){
  if(!ROLE)return '<p class="muted">Stai guardando questa partita senza un posto al tavolo.</p>';
  if(!g.pc&&g.step!=='lobby'&&g.step!=='tb_create')return '<div class="wait"><span class="dot"></span><span>Sincronizzazione in corso…</span></div>';
  if(ui.amending)return amendHTML();
+ if(ui.renaming)return renameHTML();
  if(g.objection&&ROLE==='tb')return objectionHTML()+oocHTML();
  let h='';
  switch(g.step){
@@ -357,6 +367,12 @@ function amendHTML(){
  if(!e){ui.amending=null;return '';}
  return '<div class="form"><h3>Emenda</h3><p class="hint">La nuova versione prende il posto di questa nel diario; quella di prima resta consultabile. Vale da ora in poi.</p>'+
   fld('am_text','Nuova versione',{rows:4,def:textOf(e)})+'<div class="row">'+btn('Salva la correzione','amendSave','primary')+btn('Annulla','amendCancel','ghost')+'</div></div>';
+}
+function renameHTML(){
+ const r=(G.rels||[]).find(x=>x.id===ui.renaming);
+ if(!r){ui.renaming=null;return '';}
+ return '<div class="form"><h3>Dai un nome a '+esc(r.name)+'</h3><p class="hint">Il nome vale da ora in poi, anche nella lista dei roll-again; la descrizione di partenza resta come nota.</p>'+
+  fld('rn_name','Nome',{max:60,def:r.name})+'<div class="row">'+btn('Salva il nome','relRenameSave','primary')+btn('Annulla','relRenameCancel','ghost')+'</div></div>';
 }
 function objectionHTML(){
  const o=G.objection,e=LOG.find(x=>x._id===o.of);
@@ -571,6 +587,15 @@ const ACT={
  chatOpen(){ui.tab='chat';document.body.classList.add('drawer');lastSideKey='';render();const n=$('[data-d="chat"]');if(n)n.focus();},
  chatRe(el){D.chat_re=el.dataset.id;ACT.chatOpen();},
  chatReClear(){clear('chat_re');lastSideKey='';render();},
+ relRenameOpen(el){ui.renaming=el.dataset.id;delete D.rn_name;ui.rev++;render();},
+ relRenameCancel(){ui.renaming=null;clear('rn_name');ui.rev++;render();},
+ async relRenameSave(){
+  const n=v('rn_name');if(!n)throw 'Scrivi il nome.';
+  if(!await A.relRename(ui.renaming,n))throw 'Il nome non è cambiato.';
+  ui.renaming=null;clear('rn_name');ui.rev++;render();
+ },
+ async relHereToggle(el){const r=G.rels.find(x=>x.id===el.dataset.id);if(r)await A.relPresence(r.id,{here:!r.here});},
+ async relAlwaysToggle(el){const r=G.rels.find(x=>x.id===el.dataset.id);if(r)await A.relPresence(r.id,{always:!r.always});},
  amendOpen(el){ui.amending=el.dataset.id;delete D.am_text;ui.rev++;render();},
  amendCancel(){ui.amending=null;clear('am_text');ui.rev++;render();},
  async amendSave(){
