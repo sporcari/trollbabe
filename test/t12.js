@@ -11,7 +11,7 @@ const assert=require('assert');
   await TA.A.savePrep({stakes:'S',a:'A',b:'B',chars:'',where:'',who:'',notes:''});await S();
   await TA.A.openScene('Scena',['Eirik'],false);await S();
   await TB.A.declare('tb',{type:'fighting',pace:1,goal:'g'});await S();await TA.A.paceAdj('keep');await S();
-  await TA.A.fairSay('gm','a');await S();await TB.A.fairSay('tb','b');await S();await TA.A.fairOk('gm');await S();await TB.A.fairOk('tb');await S();await S();
+  await TB.A.fairSay('tb','b');await S();await TA.A.fairSay('gm','a');await S();await TB.A.fairOk('tb');await S();await S();
   await TB.A.roll(1);await S();await TA.A.narrGM('ok');await S();
   await TB.A.relPropose({name:'Eirik',type:'ally',text:'Gli porge acqua.'});await S();
   assert.strictEqual(TA.G.step,'rel_approve');

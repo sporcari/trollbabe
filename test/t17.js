@@ -9,6 +9,7 @@ const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if
    scene_open:()=>({text:'Riva del fiume. Harald alza l’ascia.',npcs:['Harald'],heal:false}),
    gm_respond:()=>({text:'Harald aspetta.'}),
    fair_gm:()=>({text:'Harald carica con l’ascia del padre.'}),
+   step_gm:()=>({text:'Harald ritenta.'}),
    narr_gm:()=>({text:'Un passo avanti.'})
   };
   const w=makeClient(makeStore(),'uA',{ai});await sleep(120);const T=w.__TB;
@@ -19,6 +20,7 @@ const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if
   const prompts=()=>w.__calls.filter(c=>c.task==='narr_gm').map(c=>c.prompt);
   const stopLabel=()=>{const b=doc.querySelector('[data-act="narrStop"]');return b?b.textContent:null;};
   const stage=s=>until(()=>T.G.conflict&&T.G.conflict.stage===s,3000,'stage '+s);
+  const step=async()=>{await until(()=>T.G.conflict.stage==='step'&&T.G.conflict.step.gm!==null,3000,'mossa del GM');await T.A.stepSay('tb','Incalzo.');};
 
   // funzione pura
   eq(T.lastSeries({succ:0,fail:0,pace:3},'success'),false,'1 su 3 non chiude');
@@ -37,22 +39,22 @@ const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if
   await until(()=>prompts().length===1,3000,'narr_gm 1');
   assert.ok(prompts()[0].indexOf('il Goal NON è ancora raggiunto')>=0,'Serie 1 riuscita: il GM non deve concedere il Goal');
   assert.ok(prompts()[0].indexOf('Il Goal della trollbabe è RIUSCITO')<0,'Serie 1: niente Goal riuscito');
-  await until(()=>T.G.conflict.series===2&&T.G.conflict.stage==='roll',3000,'Serie 2');
+  await step();await until(()=>T.G.conflict.series===2&&T.G.conflict.stage==='roll',3000,'Serie 2');
 
   await T.A.roll(9);await stage('narr_tb');await sleep(40);
   eq(stopLabel(),'Accetta l’esito e vai alla Serie successiva','Serie 2 fallita, conflitto aperto');
   await T.A.narrTB('Devo schivare l’ascia e mi allontano dal troll.',null);
-  await until(()=>T.G.conflict.series===3,3000,'Serie 3');
+  await step();await until(()=>T.G.conflict.series===3&&T.G.conflict.stage==='roll',3000,'Serie 3');
 
   await T.A.roll(1);
   await until(()=>prompts().length===2,3000,'narr_gm 2');
   assert.ok(prompts()[1].indexOf('Serie riuscite 2 su 3')>=0,'conteggio nel prompt');
-  await until(()=>T.G.conflict.series===4&&T.G.conflict.stage==='roll',3000,'Serie 4');
+  await step();await until(()=>T.G.conflict.series===4&&T.G.conflict.stage==='roll',3000,'Serie 4');
 
   await T.A.roll(9);await stage('narr_tb');await sleep(40);
   eq(stopLabel(),'Accetta l’esito e vai alla Serie successiva','Serie 4 fallita (2 su 3), conflitto aperto');
   await T.A.narrTB('Scivolo sul fango.',null);
-  await until(()=>T.G.conflict.series===5,3000,'Serie 5');
+  await step();await until(()=>T.G.conflict.series===5&&T.G.conflict.stage==='roll',3000,'Serie 5');
 
   await T.A.roll(1);
   await until(()=>prompts().length===3,3000,'narr_gm 3');

@@ -141,7 +141,7 @@ function addNpcs(g,list){
 function beginEnd(g,push,why){g.step='ending';g.endWhy=why;push('sys','',why+' L’avventura volge al termine.');}
 function startConflict(g,push,seat,o){
   g.conflict={by:seat,type:o.type,pace:o.pace,goal:o.goal||'',succ:0,fail:0,series:1,box:0,roll:null,kind:null,usedRels:[],
-    fair:{gm:'',tb:'',gmOk:false,tbOk:false},stage:seat==='tb'?'pace':'goal',departing:!!g.leaving,lastNarr:null};
+    fair:{gm:'',tb:'',gmOk:false,tbOk:false,turn:'tb',round:0},stage:seat==='tb'?'pace':'goal',departing:!!g.leaving,lastNarr:null};
   g.leaving=false;g.step='conflict';
   push('sys','','Conflict! '+(seat==='tb'?pcName(g):'Il GM')+' dichiara un conflitto '+TYPES[o.type].label+'.');
 }
@@ -170,7 +170,7 @@ function endSeries(g,push,result){
       c.relCosts=c.usedRels.map(id=>({id:id,status:relCost(done,she)}));
     }else afterConflict(g,push);
   }else{
-    c.series++;c.box=startBox(g);c.sb=c.box;c.stage='roll';c.kind=null;c.roll=null;
+    c.series++;c.box=startBox(g);c.sb=c.box;c.stage='step';c.step={gm:null,tb:null};c.kind=null;c.roll=null;
     push('sys','','Serie '+(c.succ+c.fail)+' chiusa: '+c.succ+' riuscite, '+c.fail+' fallite. Si continua.');
   }
 }
@@ -273,18 +273,23 @@ const A={
   if(p!==c.pace){push('sys','','Il GM sposta il Pace: '+PACES[p].label+'.');c.pace=p;}
   c.stage='fair';
  });},
+ // Fair and clear a turni: dichiarare vale come accettare la propria versione e passa la mano
  fairSay(seat,text){return tx((g,push)=>{
-  const c=g.conflict;if(!c||c.stage!=='fair')return false;
-  c.fair[seat]=text;c.fair.gmOk=false;c.fair.tbOk=false;
+  const c=g.conflict;if(!c||c.stage!=='fair'||c.fair.turn!==seat)return false;
+  const o=seat==='gm'?'tb':'gm';
+  c.fair[seat]=text;c.fair[seat+'Ok']=true;c.fair[o+'Ok']=false;c.fair.turn=o;c.fair.round++;
  });},
  fairOk(seat){return tx((g,push)=>{
-  const c=g.conflict;if(!c||c.stage!=='fair'||!c.fair.gm||!c.fair.tb)return false;
+  const c=g.conflict;if(!c||c.stage!=='fair'||c.fair.turn!==seat||!c.fair.gm||!c.fair.tb)return false;
   c.fair[seat+'Ok']=true;
-  if(c.fair.gmOk&&c.fair.tbOk)startSeries(g,push);
+  if(c.fair.gmOk&&c.fair.tbOk)startSeries(g,push);else c.fair.turn=seat==='gm'?'tb':'gm';
  });},
- fairSettle(){return tx((g,push)=>{
-  const c=g.conflict;if(!c||c.stage!=='fair'||!c.fair.gm||!c.fair.tb||!c.fair.gmOk||!c.fair.tbOk)return false;
-  startSeries(g,push);
+ // passo prima di ogni Serie successiva: mossa degli avversari (anche nessuna), poi azione della trollbabe
+ stepSay(seat,text){return tx((g,push)=>{
+  const c=g.conflict;if(!c||c.stage!=='step')return false;
+  if(seat==='gm'&&c.step.gm===null){c.step.gm=text||'';if(text)push('gm','gm',text,{kind:'step'});return;}
+  if(seat==='tb'&&c.step.gm!==null&&text){c.step.tb=text;push('tb','tb',text,{kind:'step'});c.stage='roll';return;}
+  return false;
  });},
  roll(v){return tx((g,push)=>{
   const c=g.conflict;if(!c||c.stage!=='roll')return false;
@@ -314,6 +319,7 @@ const A={
   if(choice&&choice.item){
    const lab=useItem(g,choice.item);if(!lab)return false;
    c.box++;c.stage='roll';c.roll=null;push('sys','','Roll-again: '+lab+'.');
+   if(choice.how)push('tb','tb',choice.how,{kind:'item'});
   }else endSeries(g,push,'fail');
  });},
  decide(choice){return tx((g,push)=>{
@@ -374,7 +380,8 @@ function expected(g){
    switch(c.stage){
     case 'goal':case 'roll':case 'narr_tb':case 'decide_tb':case 'rels':return ['tb'];
     case 'pace':case 'narr_gm':return ['gm'];
-    case 'fair':{const o=[];if(!c.fair.gm||!c.fair.gmOk)o.push('gm');if(!c.fair.tb||!c.fair.tbOk)o.push('tb');return o;}
+    case 'fair':return [c.fair.turn||'tb'];
+    case 'step':return [c.step&&c.step.gm===null?'gm':'tb'];
    }
  }
  return [];

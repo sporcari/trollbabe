@@ -28,9 +28,12 @@ async function tbBot(w,b){
       switch(c.stage){
         case 'goal':need('setGoal');D.cg_goal='Lo calmo';D.cg_adj='up';await ACT.setGoal();return true;
         case 'fair':
+          if(c.fair.turn!=='tb')return false;
           if(!c.fair.tb){need('fairSay');D.fr_text='Retta si pianta davanti a lui.';await ACT.fairSay();return true;}
-          if(c.fair.gm&&!c.fair.tbOk){need('fairOk');await ACT.fairOk();return true;}
-          return false;
+          need('fairOk');await ACT.fairOk();return true;
+        case 'step':
+          if(c.step.gm===null)return false;
+          need('stepSay');D.st_text='Retta incalza ('+c.series+').';await ACT.stepSay();return true;
         case 'roll':{
           need('roll');
           const v=b.rolls&&b.rolls.length?b.rolls.shift():rnd();
@@ -40,7 +43,7 @@ async function tbBot(w,b){
           if(c.kind==='alt_incap'){need('narrTB');D.nt_text='Striscia via tra le felci.';await ACT.narrTB();return true;}
           const items=T.availableItems(G);
           const cont=items.length&&(b.alwaysCont||Math.random()<0.6);
-          D.nt_text='Il Goal sfugge ('+c.kind+').';
+          D.nt_text='Il Goal sfugge ('+c.kind+').';D.nt_how='Ciò che ha sotto mano la rimette in piedi.';
           if(cont){need('narrCont');await ACT.narrCont();}else{need('narrStop');await ACT.narrStop();}
           return true;}
         case 'decide_tb':{
@@ -92,9 +95,13 @@ async function gmBot(w,b){
       switch(c.stage){
         case 'pace':need('paceAdj');D.cp_adj='down';await ACT.paceAdj();return true;
         case 'fair':
-          if(!c.fair.gm&&c.fair.tb){need('fairSay');D.fr_text='Gli avversari si aprono a ventaglio.';await ACT.fairSay();return true;}
-          if(c.fair.tb&&c.fair.gm&&!c.fair.gmOk){need('fairOk');await ACT.fairOk();return true;}
-          return false;
+          if(c.fair.turn!=='gm')return false;
+          if(!c.fair.gm){need('fairSay');D.fr_text='Gli avversari si aprono a ventaglio.';await ACT.fairSay();return true;}
+          need('fairOk');await ACT.fairOk();return true;
+        case 'step':
+          if(c.step.gm!==null)return false;
+          if(c.series%2){need('stepNone');await ACT.stepNone();return true;}
+          need('stepSay');D.st_text='Hrenk ritenta.';await ACT.stepSay();return true;
         case 'narr_gm':need('narrGM');D.ng_text='Un’unica immagine: '+c.kind;await ACT.narrGM();return true;
       }
       return false;

@@ -11,6 +11,7 @@ const ai={
                  : n===4?{text:'Altra nebbia.',end_scene:false}
                  : {text:'Il molo brucia.',end_adventure:true},
   fair_gm:()=>({text:'Hrenk avanza minaccioso.'}),
+  step_gm:()=>({text:'Hrenk ritenta.'}),
   narr_gm:()=>({text:'Un colpo netto.'}),
   ending:()=>({outcome:'b',text:'Il porto cade.'}),
 };

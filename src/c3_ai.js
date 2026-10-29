@@ -7,7 +7,7 @@ const GM_RULES='Sei il GM di una partita di TROLLBABE (gioco di ruolo fantasy no
 '• I tuoi PNG vedono la trollbabe come legata ai loro interessi (opportunità o minaccia); dicono apertamente cosa vogliono, di parte; possono cambiare idea; agiscono in modo diretto quando le cose cambiano per loro, e disperato quando gli Stakes sembrano sfuggire o quasi raggiunti.\n'+
 '• Conflitti: non riguardano la difficoltà (per una trollbabe ciò che un umano fa, anche a stento, è facile) ma i personaggi. TEST DA APPLICARE A OGNI AZIONE DELLA TROLLBABE: metti i panni del personaggio coinvolto e chiediti «mi sta bene che vada come dice lei?». Se la risposta è no (lei lo colpisce, lo uccide, lo deruba, lo inganna, lo costringe, gli porta via o mette a rischio ciò che gli sta a cuore), CHIAMA IL CONFLITTO e non narrare l’esito: il PNG ha diritto di non morire, di non farsi derubare, di non cedere, e lo decidono i dadi. Vale in particolare per i PNG con nome, ma anche un comprimario senza nome che si oppone merita il conflitto. Se invece a nessuno importa e nessuno si oppone, lascia che l’azione semplicemente accada. Le domande per capire le persone NON sono conflitti: i PNG si sfogano e basta.\n'+
 '• Action Type: fighting = solo violenza; magic = lenta e flessibile, richiede tempo; social = cambia il comportamento altrui.\n'+
-'• Pace: 3 = azione per azione, 2 = scontro per scontro, 1 = intero conflitto in un tiro.\n'+
+'• Pace: 3 = azione per azione, 2 = scontro per scontro, 1 = intero conflitto in un tiro. Ogni Serie è un passo verso il Goal: prima di ogni tiro tu dici la mossa degli avversari e la trollbabe dice cosa fa; il tiro decide l’esito di quell’azione.\n'+
 '• Fair and clear: dichiara apertamente tutto ciò che può opporsi alla trollbabe e farle del male (avversari, ambiente, magia, anche ciò che era nascosto). Ciò che non dici in quella fase non potrai introdurlo dopo: né nei successi, né nelle ferite, né nell’incapacità.\n'+
 '• Una scena è definita da luogo e personaggi presenti. Chiudila con un cambio sostanziale di luogo o a una pausa naturale. Il Scale limita ciò che la trollbabe può compiere di persona.\n'+
 '• Se narri un successo: una sola immagine forte, nello stile della giocatrice. Se la trollbabe è incapacitata: sii ostile ma coerente.\n'+
@@ -19,7 +19,7 @@ const TB_RULES='Sei la giocatrice che interpreta una trollbabe in una partita di
 'La trollbabe è una donna enorme (oltre due metri), né troll né umana, con corna, più forte di qualunque umano. Per lei la difficoltà non è un problema: i conflitti riguardano i personaggi e ciò che vogliono. Il mondo: fiordi, nebbie, pini, Età del Ferro; umani e troll che si detestano; guai di faide, gelosie, tradimenti, maledizioni.\n\n'+
 'COME GIOCARLA. Scopri chi è: piacevole o no, violenta o pacifista, costruttiva o destabilizzante. Agisci, giudica, fatti amici e nemici, rischia quando conta. Non inventare ciò che il GM non ha detto (niente nuove informazioni) e non narrare l’esito dei tuoi tentativi: lo narra il GM se riesci; tu solo se fallisci.\n'+
 '• Un Goal è un risultato attivo che coinvolge qualcuno o qualcosa che non sei tu; non passivo («sopravvivere»), non un’emozione tua, non troppo specifico, non il solo gesto che avvia il conflitto.\n'+
-'• Action Type: fighting = solo violenza; magic = lenta e flessibile; social = cambia il comportamento altrui. Pace: 3 azione per azione, 2 scontro per scontro, 1 intero conflitto in un tiro.\n'+
+'• Action Type: fighting = solo violenza; magic = lenta e flessibile; social = cambia il comportamento altrui. Pace: 3 azione per azione, 2 scontro per scontro, 1 intero conflitto in un tiro. Prima di ogni tiro dici cosa fa la trollbabe: il tiro decide se le riesce.\n'+
 '• Se fallisci, la tua scomodità o ferita deve avere senso rispetto al tipo di conflitto (contraccolpo mistico per Magic, ferite o sfinimento per Fighting, orgoglio ferito o ritorsione per Social) e a ciò che è accaduto; poi ricordala nelle scene seguenti.\n'+
 'Scrivi al massimo 70 parole per risposta, salvo diversa indicazione.';
 
@@ -76,17 +76,26 @@ const TASKS={
  tb_act:()=>'È il tuo turno: dì o fai qualcosa di coerente con chi è la tua trollbabe e con ciò che sta succedendo. Se vuoi un conflitto (cioè agisci per ottenere qualcosa da qualcuno o contro qualcuno), compila "conflict" con type, pace e goal (null altrimenti). "leave": true solo se vuoi davvero lasciare il luogo. "ask_end": true se la scena ti sembra conclusa.',
  tb_request:()=>'La scena è finita. Dì dove vuoi andare o cosa vuoi fare nella prossima scena (una frase). "heal": true se sei ferita o incapacitata e vuoi che sia una scena di cura.',
  goal:()=>'Il GM ha dichiarato un conflitto '+TYPES[G.conflict.type].label+'. Dichiara il tuo Goal: un risultato attivo che coinvolge qualcun altro o qualcosa, detto in generale, non passivo e non troppo specifico.',
- fair_gm:()=>'Fair and clear: descrivi cosa fanno i PNG avversari all’inizio di questo conflitto e dichiara apertamente tutto ciò che si oppone alla trollbabe e può farle del male (avversari, ambiente, magia, anche ciò che finora era nascosto): ciò che non dici adesso non potrai introdurlo dopo. Descrivi cosa stanno facendo e cosa si oppone, non cosa succederà: niente esiti né conseguenze anticipate. Massimo 70 parole.',
- fair_tb:()=>'Fair and clear: descrivi cosa fa la tua trollbabe all’inizio di questo conflitto (azione di apertura, vivida). Non decidere l’esito. Massimo 50 parole.',
+ fair_gm:()=>'Fair and clear: descrivi cosa fanno i PNG avversari all’inizio di questo conflitto e dichiara apertamente tutto ciò che si oppone alla trollbabe e può farle del male (avversari, ambiente, magia, anche ciò che finora era nascosto): ciò che non dici adesso non potrai introdurlo dopo. Descrivi cosa stanno facendo e cosa si oppone, non cosa succederà: niente esiti né conseguenze anticipate. Massimo 70 parole.'+fairTurn('gm'),
+ fair_tb:()=>'Fair and clear: descrivi cosa fa la tua trollbabe all’inizio di questo conflitto (azione di apertura, vivida). Non decidere l’esito. Massimo 50 parole.'+fairTurn('tb'),
+ step_gm:()=>{const c=G.conflict;return 'Serie '+c.series+' del conflitto (riuscite '+c.succ+', fallite '+c.fail+' su '+c.pace+'). Prima del tiro, descrivi in una frase la mossa degli avversari in questo passo, usando solo ciò che è stato dichiarato nel Fair and clear. Niente esiti: li decide il dado. "text" vuoto se nessuno agisce. Massimo 40 parole.';},
+ step_tb:()=>{const c=G.conflict;return 'Serie '+c.series+' del conflitto (riuscite '+c.succ+', fallite '+c.fail+' su '+c.pace+'). '+(c.step&&c.step.gm?'Il GM: «'+c.step.gm+'». ':'')+'Prima del tiro, dì cosa fa la tua trollbabe in questo passo verso il Goal «'+c.goal+'»: un’azione concreta, che il tiro deciderà se le riesce. Niente esiti, niente informazioni nuove. Massimo 40 parole.';},
  narr_gm:()=>{const c=G.conflict;return c.kind==='success'&&!lastSeries(c,'success')?'Questa Serie è RIUSCITA, ma il conflitto non è finito (Serie riuscite '+(c.succ+1)+' su '+c.pace+' necessarie, fallite '+c.fail+'): il Goal NON è ancora raggiunto. Narra con una sola immagine come la trollbabe si avvicina al Goal in questo passo; avversari e ostacoli dichiarati restano in gioco. Niente nuove azioni di PNG né nuovi conflitti. Massimo 50 parole.':c.kind==='success'?'Il Goal della trollbabe è RIUSCITO. Narra il successo con una sola immagine forte, nello stile con cui la giocatrice l’ha giocata. Niente nuove azioni di PNG né nuovi conflitti. Massimo 50 parole.':'La trollbabe è INCAPACITATA (Goal fallito). Narra in modo ostile ma coerente (con il tipo di conflitto e con ciò che è accaduto) che cosa le succede e come finisce a terra o in balia degli avversari. Usa solo minacce e mezzi già dichiarati nel Fair and clear: niente nuove rivelazioni. Massimo 60 parole.';},
- narr_tb:()=>{const k=G.conflict.kind;return k==='alt_incap'?'Il terzo roll-again è RIUSCITO: il Goal resta perso e la trollbabe è incapacitata, ma tu descrivi in che circostanze meno gravi si ritrova (es. riesce a trascinarsi da un amico). Massimo 50 parole.':'Il tiro è FALLITO ('+(k==='inconv'?'scomodata':'ferita')+'). Narra il fallimento: il Goal sta cedendo (è la sostanza), '+(k==='inconv'?'la scomodità':'la ferita')+' è un dettaglio e deve avere senso per il tipo di conflitto e per ciò che è accaduto. Poi decidi: "continue": false = accetti l’esito, '+(lastSeries(G.conflict,'fail')?'e il Goal fallisce':'questa Serie è persa e si passa alla Serie successiva (Serie fallite '+(G.conflict.fail+1)+' su '+G.conflict.pace+')')+'; true = rischi un roll-again con una delle voci disponibili ("item" = id esatto) e nella narrazione descrivi come la usi. Rischiare ti espone a ferita e incapacità: fallo se il Goal ti sta a cuore.';},
+ narr_tb:()=>{const k=G.conflict.kind;return k==='alt_incap'?'Il terzo roll-again è RIUSCITO: il Goal resta perso e la trollbabe è incapacitata, ma tu descrivi in che circostanze meno gravi si ritrova (es. riesce a trascinarsi da un amico). Massimo 50 parole.':'Il tiro è FALLITO ('+(k==='inconv'?'scomodata':'ferita')+'). Narra il fallimento: il Goal sta cedendo (è la sostanza), '+(k==='inconv'?'la scomodità':'la ferita')+' è un dettaglio e deve avere senso per il tipo di conflitto e per ciò che è accaduto. Poi decidi: "continue": false = accetti l’esito, '+(lastSeries(G.conflict,'fail')?'e il Goal fallisce':'questa Serie è persa e si passa alla Serie successiva (Serie fallite '+(G.conflict.fail+1)+' su '+G.conflict.pace+')')+'; true = rischi un roll-again con una delle voci disponibili ("item" = id esatto) e in "how" descrivi come ti aiuta (massimo 40 parole); "text" contiene solo il fallimento. Rischiare ti espone a ferita e incapacità: fallo se il Goal ti sta a cuore.';},
  decide_tb:()=>G.conflict.kind==='incap'?'Sei incapacitata (il GM ha narrato). Puoi accettare ("accept": true) oppure giocare l’ultimo roll-again ("accept": false, "item" = id esatto, "text" = come lo usi, max 40 parole) per attenuare la sorte.':'Il terzo roll-again è fallito: resta la narrazione del GM ("die": false) oppure dichiari la morte della trollbabe ("die": true) e la descrivi in "text" (max 40 parole). Scegli la morte solo se è ciò che il personaggio vuole davvero.',
  rel_offer:()=>'Il conflitto è finito. Puoi legarti a un personaggio che era presente (alleato "ally", avversario "opp", amante "lover"). "form": true solo se ha senso per la tua trollbabe. "name": un PNG con nome già in scena oppure un anonimo ("uno dei guerrieri"). "text": come interagisce con lei subito dopo (max 40 parole).',
  ending:()=>'L’avventura finisce ('+(G.endWhy||'')+'). Scegli quale esito degli Stakes avviene ("a" o "b") se non si è risolto in gioco, e scrivi l’epilogo: cosa succede al luogo su scala più grande (max 90 parole), senza nuove scene.',
  interim:()=>'Tra un’avventura e l’altra. "delta": -1, 0 o 1 per il tuo numero. "drop": id delle Relationship che sciogli (lista, anche vuota). "scaleUp": true per far salire il Scale di 1. "loc": numero del luogo dove vai ora: '+LOCS.map(l=>l.id+' '+l.name).join(', ')+'.'
 };
 
-const LIGHT=['goal','fair_gm','fair_tb','rel_offer','interim','tb_request','decide_tb'];
+// turni successivi del Fair and clear: l’IA rilegge la dichiarazione dell’altro e accetta o aggiorna la propria
+function fairTurn(s){
+ const f=G.conflict.fair,o=s==='gm'?'tb':'gm',who=s==='gm'?'La trollbabe':'Il GM';
+ if(!f[s])return f[o]?' '+who+' ha dichiarato: «'+f[o]+'».':'';
+ return ' È di nuovo il tuo turno. '+who+' ha dichiarato: «'+f[o]+'». La tua dichiarazione attuale: «'+f[s]+'». Se resta coerente con la sua rispondi {"accept":true}; se va adattata, rispondi con "text" = la nuova versione completa.';
+}
+const FAIR_ROUNDS=6;
+const LIGHT=['goal','fair_gm','fair_tb','step_gm','step_tb','rel_offer','interim','tb_request','decide_tb'];
 const tierFor=t=>(AI.tier==='default'&&LIGHT.indexOf(t)>=0)?'quick':AI.tier;
 async function callAI(role,task,schema,extra,own){
  const ch=role==='gm'?chatText():'';
@@ -127,6 +136,15 @@ function pickItem(x){
  const items=availableItems(G);if(!items.length)return null;
  const s=String(x||'');
  return (items.find(i=>i.id===s)||items.find(i=>i.label.toLowerCase().indexOf(s.toLowerCase())===0&&s)||items[0]).id;
+}
+async function fairJob(s,seq){
+ const f=G.conflict.fair;
+ if(f[s]&&f.round>=FAIR_ROUNDS){fresh(seq);await A.fairOk(s);return;}
+ const r=await callAI(s,'fair_'+s,f[s]?'{"accept":true} oppure {"text":"…"}':'{"text":"…"}');fresh(seq);
+ const t=str(r.text,700);
+ if(f[s]&&(r.accept===true||!t||t===f[s])){await A.fairOk(s);return;}
+ if(!t)throw {code:'empty_completion'};
+ await A.fairSay(s,t);
 }
 const J={
  pcCreate:{label:'L’IA crea la trollbabe…',async run(seq){
@@ -187,16 +205,16 @@ const J={
   await A.setGoal(t,'keep');
  }},
  paceKeep:{label:'…',async run(seq){fresh(seq);await A.paceAdj('keep');}},
- fairGM:{label:'Il GM descrive gli avversari…',async run(seq){
-  const r=await callAI('gm','fair_gm','{"text":"…"}');fresh(seq);
-  const t=str(r.text,700);if(!t)throw {code:'empty_completion'};await A.fairSay('gm',t);
+ fairGM:{label:'Il GM descrive gli avversari…',run:seq=>fairJob('gm',seq)},
+ fairTB:{label:'La trollbabe apre il conflitto…',run:seq=>fairJob('tb',seq)},
+ stepGM:{label:'Il GM muove gli avversari…',async run(seq){
+  const r=await callAI('gm','step_gm','{"text":"…"}');fresh(seq);
+  await A.stepSay('gm',str(r.text,500));
  }},
- fairTB:{label:'La trollbabe apre il conflitto…',async run(seq){
-  const r=await callAI('tb','fair_tb','{"text":"…"}');fresh(seq);
-  const t=str(r.text,700);if(!t)throw {code:'empty_completion'};await A.fairSay('tb',t);
+ stepTB:{label:'La trollbabe agisce…',async run(seq){
+  const r=await callAI('tb','step_tb','{"text":"…"}');fresh(seq);
+  const t=str(r.text,500);if(!t)throw {code:'empty_completion'};await A.stepSay('tb',t);
  }},
- fairOkGM:{label:'…',async run(seq){fresh(seq);await A.fairOk('gm');}},
- fairOkTB:{label:'…',async run(seq){fresh(seq);await A.fairOk('tb');}},
  roll:{label:'La trollbabe tira il dado…',async run(seq){await sleep(900);fresh(seq);await A.roll(d10());}},
  narrGM:{label:'Il GM narra…',async run(seq){
   const r=await callAI('gm','narr_gm','{"text":"…"}',G.conflict.roll?'Ultimo tiro: '+G.conflict.roll.v+'.':'');fresh(seq);
@@ -204,10 +222,10 @@ const J={
  }},
  narrTB:{label:'La trollbabe narra…',async run(seq){
   const k=G.conflict.kind;
-  const r=await callAI('tb','narr_tb',k==='alt_incap'?'{"text":"…"}':'{"text":"…","continue":false,"item":"id"}',k==='alt_incap'?'':itemHelp());fresh(seq);
+  const r=await callAI('tb','narr_tb',k==='alt_incap'?'{"text":"…"}':'{"text":"…","continue":false,"item":"id","how":"…"}',k==='alt_incap'?'':itemHelp());fresh(seq);
   const t=str(r.text,700);if(!t)throw {code:'empty_completion'};
   const it=(k!=='alt_incap'&&r.continue)?pickItem(r.item):null;
-  await A.narrTB(t,it?{item:it}:null);
+  await A.narrTB(t,it?{item:it,how:str(r.how,500)}:null);
  }},
  decideTB:{label:'La trollbabe decide…',async run(seq){
   const k=G.conflict.kind;
@@ -251,16 +269,8 @@ function nextAIJob(){
    switch(c.stage){
     case 'goal':return aiSeat('tb')?J.goal:null;
     case 'pace':return aiSeat('gm')?J.paceKeep:null;
-    case 'fair':{
-     if(aiSeat('tb')){
-      if(!c.fair.tb)return J.fairTB;
-      if(c.fair.gm&&!c.fair.tbOk)return J.fairOkTB;
-     }
-     if(aiSeat('gm')){
-      if(!c.fair.gm&&c.fair.tb)return J.fairGM;
-      if(c.fair.tb&&c.fair.gm&&!c.fair.gmOk)return J.fairOkGM;
-     }
-     return null;}
+    case 'fair':{const s=c.fair.turn||'tb';return aiSeat(s)?(s==='gm'?J.fairGM:J.fairTB):null;}
+    case 'step':{const s=expected(g)[0];return aiSeat(s)?(s==='gm'?J.stepGM:J.stepTB):null;}
     case 'roll':return aiSeat('tb')?J.roll:null;
     case 'narr_gm':return aiSeat('gm')?J.narrGM:null;
     case 'narr_tb':return aiSeat('tb')?J.narrTB:null;

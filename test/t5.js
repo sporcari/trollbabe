@@ -13,7 +13,7 @@ async function setup(num){
 }
 async function conflict(pace,type,goal){
   await T.A.declare('tb',{type:type||'fighting',pace:pace,goal:goal||'x'});await T.A.paceAdj('keep');
-  await T.A.fairSay('gm','a');await T.A.fairSay('tb','b');await T.A.fairOk('gm');await T.A.fairOk('tb');
+  await T.A.fairSay('tb','b');await T.A.fairSay('gm','a');await T.A.fairOk('tb');
 }
 const C=()=>T.G.conflict;
 (async()=>{
@@ -69,7 +69,7 @@ const C=()=>T.G.conflict;
   // ---- lascio il luogo
   await T.A.leave();eq(T.G.leaving,true,'leaving');
   await T.A.declare('gm',{type:'social',pace:1,goal:''});eq(C().departing,true,'conflitto di partenza');eq(C().stage,'goal','il goal lo dice la giocatrice');eq(T.G.leaving,false,'leaving azzerato');
-  await T.A.setGoal('Convinco i guardiani a lasciarmi andare','keep');await T.A.fairSay('gm','a');await T.A.fairSay('tb','b');await T.A.fairOk('gm');await T.A.fairOk('tb');
+  await T.A.setGoal('Convinco i guardiani a lasciarmi andare','keep');await T.A.fairSay('tb','b');await T.A.fairSay('gm','a');await T.A.fairOk('tb');
   await T.A.roll(8);await T.A.narrGM('Passa.');eq(T.G.step,'ending','riuscire a partire chiude l’avventura');
   console.log('E OK: lasciare il luogo');
   // ---- fine, interim

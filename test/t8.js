@@ -32,7 +32,7 @@ const eq=(a,b,m)=>assert.strictEqual(a,b,m+' (atteso '+b+', trovato '+a+')');
   const S=()=>sleep(120);
   await TA3.A.say('tb','x');await S();await TA.A.say('gm','y');await S();
   await TA3.A.declare('tb',{type:'fighting',pace:1,goal:'g'});await S();await TA.A.paceAdj('keep');await S();
-  await TA.A.fairSay('gm','a');await S();await TA3.A.fairSay('tb','b');await S();await TA.A.fairOk('gm');await S();await TA3.A.fairOk('tb');await sleep(250);
+  await TA3.A.fairSay('tb','b');await S();await TA.A.fairSay('gm','a');await S();await TA3.A.fairOk('tb');await sleep(250);
   console.log('stage',TA3.G.step,TA3.G.conflict&&TA3.G.conflict.stage,'turn',TA3.G.turn,'| dock:',A3.document.querySelector('#dock-body').textContent.slice(0,160));
   assert.ok(A3.document.querySelector('#die'),'dado nel dock');
   assert.ok(A3.document.querySelector('.col').classList.contains('formmode')===false,'formmode spento durante il conflitto');

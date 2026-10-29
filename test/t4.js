@@ -19,14 +19,18 @@ async function toRoll(pace,type){
   await T.A.declare('tb',{type:type||'fighting',pace:pace,goal:'Fermo Orm'});
   eq(T.G.conflict.stage,'pace','dopo declare');
   await T.A.paceAdj('keep');eq(T.G.conflict.stage,'fair','dopo pace');
-  await T.A.fairSay('gm','Orm carica');await T.A.fairSay('tb','Retta attende');
-  // modificare il testo resetta le conferme
-  await T.A.fairOk('gm');eq(T.G.conflict.stage,'fair','una conferma sola non basta');
-  await T.A.fairSay('tb','Retta attende, ascia in mano');eq(T.G.conflict.fair.gmOk,false,'la modifica deve azzerare le conferme');
-  await T.A.fairOk('gm');await T.A.fairOk('tb');
+  // a turno: prima la trollbabe, poi il GM; fuori turno non si scrive
+  await T.A.fairSay('tb','Retta attende');eq(T.G.conflict.fair.turn,'gm','dopo la trollbabe tocca al GM');
+  await T.A.fairSay('tb','fuori turno');eq(T.G.conflict.fair.tb,'Retta attende','fuori turno non si modifica');
+  await T.A.fairSay('gm','Orm carica');eq(T.G.conflict.fair.turn,'tb','poi alla trollbabe');eq(T.G.conflict.stage,'fair','una dichiarazione non chiude');
+  // modificare passa la mano e azzera l'accettazione dell'altro
+  await T.A.fairSay('tb','Retta attende, ascia in mano');eq(T.G.conflict.fair.gmOk,false,'la modifica deve azzerare le conferme');eq(T.G.conflict.fair.turn,'gm','la modifica passa la mano');
+  await T.A.fairOk('gm');
   eq(T.G.conflict.stage,'roll','dopo fair');
 }
 const C=()=>T.G.conflict;
+const fair=async()=>{await T.A.fairSay('tb','b');await T.A.fairSay('gm','a');await T.A.fairOk('tb');};
+const step=async()=>{await T.A.stepSay('gm','Orm ritenta');await T.A.stepSay('tb','Retta incalza');};
 (async()=>{
   // ---- 1. Pace 1: successo al tiro iniziale (Fighting, numero 6: riesce con 1-5)
   await setup(6);await toRoll(1);
@@ -61,7 +65,7 @@ const C=()=>T.G.conflict;
   console.log('3b/3c OK: niente conflitti da incapacitata, cura con scena dedicata, voci già usate non tornano');
   // ---- 4. terzo roll-again riuscito: incapacitazione attenuata
   await T.A.declare('tb',{type:'magic',pace:1,goal:'Apro il sentiero'});await T.A.paceAdj('keep');
-  await T.A.fairSay('gm','a');await T.A.fairSay('tb','b');await T.A.fairOk('gm');await T.A.fairOk('tb');
+  await fair();
   // Magic con numero 6: riesce con 7-10
   await T.A.roll(1);eq(C().kind,'inconv','4 inconv');
   await T.A.narrTB('x',{item:'found'});await T.A.roll(1);eq(C().kind,'injury','4 injury');
@@ -95,27 +99,27 @@ const C=()=>T.G.conflict;
   console.log('6 OK: ferita parte dal box 1; fallire il terzo e dichiarare la morte chiude l’avventura');
   // ---- 7. Pace 3: tre Serie riuscite
   await setup(6);await toRoll(3);
-  await T.A.roll(1);await T.A.narrGM('1');eq(C().succ,1,'7 succ1');eq(C().stage,'roll','7: nuova Serie');eq(C().series,2,'7 serie 2');
-  await T.A.roll(9);await T.A.narrTB('x',null);eq(C().fail,1,'7 fail1');eq(C().series,3,'7 serie 3');
-  await T.A.roll(1);await T.A.narrGM('2');eq(C().succ,2,'7 succ2');
-  await T.A.roll(9);await T.A.narrTB('x',null);eq(C().fail,2,'7 fail2');
+  await T.A.roll(1);await T.A.narrGM('1');eq(C().succ,1,'7 succ1');eq(C().stage,'step','7: nuova Serie col passo');eq(C().series,2,'7 serie 2');await step();eq(C().stage,'roll','7: dopo il passo si tira');
+  await T.A.roll(9);await T.A.narrTB('x',null);eq(C().fail,1,'7 fail1');eq(C().series,3,'7 serie 3');await step();
+  await T.A.roll(1);await T.A.narrGM('2');eq(C().succ,2,'7 succ2');await step();
+  await T.A.roll(9);await T.A.narrTB('x',null);eq(C().fail,2,'7 fail2');await step();
   await T.A.roll(1);await T.A.narrGM('3');eq(T.G.step,'rel_offer','7: 3 su 5 chiude');eq(T.G.lastConflict.outcome,'success','7 esito');
   // Pace 3: tre fallimenti
   await T.A.relSkip();await toRoll(3);
-  for(let i=0;i<3;i++){await T.A.roll(9);await T.A.narrTB('x',null);}
+  for(let i=0;i<3;i++){if(i)await step();await T.A.roll(9);await T.A.narrTB('x',null);}
   eq(T.G.step,'rel_offer','7b: 3 fallimenti chiudono');eq(T.G.lastConflict.outcome,'fail','7b esito');
   console.log('7 OK: Pace 3 chiude a 3 successi o a 3 fallimenti');
   // ---- 8. Pace 2
   await T.A.relSkip();await toRoll(2);
-  await T.A.roll(1);await T.A.narrGM('a');await T.A.roll(1);await T.A.narrGM('b');eq(T.G.lastConflict.outcome,'success','8 successo 2/2');
+  await T.A.roll(1);await T.A.narrGM('a');await step();await T.A.roll(1);await T.A.narrGM('b');eq(T.G.lastConflict.outcome,'success','8 successo 2/2');
   await T.A.relSkip();await toRoll(2);
-  await T.A.roll(9);await T.A.narrTB('x',null);await T.A.roll(9);await T.A.narrTB('x',null);eq(T.G.lastConflict.outcome,'fail','8 fallimento 2');
+  await T.A.roll(9);await T.A.narrTB('x',null);await step();await T.A.roll(9);await T.A.narrTB('x',null);eq(T.G.lastConflict.outcome,'fail','8 fallimento 2');
   console.log('8 OK: Pace 2');
   // ---- 9. Relationship come roll-again e relative conseguenze
   await T.A.relSkip();
   // creo una Relationship anonima (non è nei PNG con nome)
   await T.A.declare('tb',{type:'social',pace:1,goal:'La convinco'});
-  await T.A.paceAdj('keep');await T.A.fairSay('gm','a');await T.A.fairSay('tb','b');await T.A.fairOk('gm');await T.A.fairOk('tb');
+  await T.A.paceAdj('keep');await fair();
   await T.A.roll(9);await T.A.narrTB('x',null); // social con numero 6: riesce da 6 in su: 9 riesce!
   console.log('   (nota: Social numero 6 riesce con 6-10; 9 è un successo)');
   process.exit(0);

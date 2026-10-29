@@ -29,16 +29,18 @@ const eq=(a,b,m)=>assert.strictEqual(a,b,m+' (atteso '+b+', trovato '+a+')');
   const ids=TA.LOG.map(e=>e._id);assert.deepStrictEqual([...ids],[...ids].sort(),'diario non ordinato per id');
   console.log('2 OK: la nota fuori gioco non cancella lo stato');
   await TA.A.paceAdj('keep');await sleep(100);
-  // 3) Fair and clear: pubblicazioni simultanee
-  await Promise.all([TA.A.fairSay('gm','azione GM'),TB.A.fairSay('tb','azione TB')]);
+  // 3) Fair and clear a turni: chi scrive fuori turno viene ignorato, il testo di turno resta
+  await Promise.all([TA.A.fairSay('gm','azione GM fuori turno'),TB.A.fairSay('tb','azione TB')]);
   await sleep(200);
-  eq(TA.G.conflict.fair.gm,'azione GM','testo GM conservato');eq(TA.G.conflict.fair.tb,'azione TB','testo TB conservato');
-  // 4) conferme simultanee: il conflitto deve partire comunque (assestamento)
+  eq(TA.G.conflict.fair.tb,'azione TB','testo TB conservato');eq(TA.G.conflict.fair.gm,'','il GM fuori turno non scrive');eq(TA.G.conflict.fair.turn,'gm','tocca al GM');
+  await TA.A.fairSay('gm','azione GM');await sleep(200);
+  eq(TB.G.conflict.fair.gm,'azione GM','testo GM replicato');eq(TB.G.conflict.fair.turn,'tb','tocca alla trollbabe');
+  // 4) conferme simultanee: vale solo quella di turno, e il conflitto parte una volta sola
   await Promise.all([TA.A.fairOk('gm'),TB.A.fairOk('tb')]);
   await sleep(500);
-  eq(TA.G.conflict.stage,'roll','il conflitto deve partire anche con conferme simultanee (stage='+TA.G.conflict.stage+' gmOk='+TA.G.conflict.fair.gmOk+' tbOk='+TA.G.conflict.fair.tbOk+')');
+  eq(TA.G.conflict.stage,'roll','il conflitto deve partire (stage='+TA.G.conflict.stage+' turn='+TA.G.conflict.fair.turn+')');
   eq(TB.G.conflict.stage,'roll','B');
   const headers=TA.LOG.filter(e=>e.type==='conflict').length;eq(headers,1,'una sola intestazione di conflitto');
-  console.log('3/4 OK: Fair and clear con scritture e conferme simultanee');
+  console.log('3/4 OK: Fair and clear a turni con scritture e conferme simultanee');
   process.exit(0);
 })().catch(e=>{console.error('FAIL',e.stack||e);process.exit(1);});

@@ -135,7 +135,7 @@ function openGame(code){
  $('#log').innerHTML='';renderedN=0;renderedIds=[];
  unsubG=gameRef(code).onSnapshot(s=>{
   if(!s.exists){toast('Partita non trovata.');showStart();return;}
-  G=s.data();render();settle();aiTick();
+  G=s.data();render();aiTick();
  },e=>toast('Errore di sincronizzazione ('+(e&&e.code||'?')+').'));
  unsubL=logCol(code).onSnapshot(q=>{LOG=q.docs.map(d=>Object.assign({_id:d.id},d.data()));renderLog();render();aiTick();},e=>{});
  secret.get(code).then(p=>{PRIV=p;lastKey='';render();aiTick();});
@@ -199,7 +199,7 @@ function renderTop(){
  p.title=peerOnline()?'L’altra persona è online':'L’altra persona non risulta online';
  p.classList.toggle('hidden',g.seats.gm.kind==='ai'||g.seats.tb.kind==='ai');
 }
-const KIND={fair:'apre il conflitto',success:'successo',incap:'incapacitata',inconv:'scomodata',injury:'ferita',alt_incap:'incapacitata, ma a modo suo',death:'morte',item:'roll-again',rel:'Relationship',epilogue:'epilogo'};
+const KIND={fair:'apre il conflitto',step:'passo',success:'successo',incap:'incapacitata',inconv:'scomodata',injury:'ferita',alt_incap:'incapacitata, ma a modo suo',death:'morte',item:'roll-again',rel:'Relationship',epilogue:'epilogo'};
 function entryHTML(e){
  const m=e.meta||{};
  switch(e.type){
@@ -225,13 +225,6 @@ function renderLog(){
  for(let i=renderedIds.length;i<LOG.length;i++){el.insertAdjacentHTML('beforeend',entryHTML(LOG[i]));renderedIds.push(LOG[i]._id);}
  renderedN=renderedIds.length;
  if(near||first||!ok)el.scrollTop=el.scrollHeight;
-}
-// se entrambe le conferme del Fair and clear arrivano nello stesso istante, le assesta chi tira i dadi
-function settle(){
- const c=G&&G.conflict;
- if(!c||c.stage!=='fair'||!c.fair.gm||!c.fair.tb||!c.fair.gmOk||!c.fair.tbOk)return;
- const mine=G.seats.tb.kind==='human'?(G.seats.tb.uid===UID&&ROLE==='tb'):isDriver();
- if(mine)A.fairSettle();
 }
 
 /* ================= tracker del conflitto ================= */
@@ -445,12 +438,16 @@ function pConflict(){
   case 'goal':return head+'<div class="form"><h3>Qual è il tuo Goal?</h3><p class="hint">'+esc(TYPES[c.type].desc)+'</p>'+fld('cg_goal','Il tuo Goal',{rows:2,ph:'Risultato attivo che coinvolge qualcun altro, detto in generale'})+'<div class="fld"><label>Pace proposto dal GM</label>'+paceSeg('cg_adj')+'</div>'+btn('Conferma','setGoal','primary')+'</div>';
   case 'pace':return head+'<div class="form"><h3>Pace</h3><p class="hint">Puoi lasciarlo com’è o spostarlo di un livello.</p>'+paceSeg('cp_adj')+btn('Conferma','paceAdj','primary')+'</div>';
   case 'fair':{
-   const mine=c.fair[me],oth=c.fair[me==='gm'?'tb':'gm'],ok=c.fair[me+'Ok'],ook=c.fair[(me==='gm'?'tb':'gm')+'Ok'];
-   const othSeat=me==='gm'?'tb':'gm';
-   return head+'<div class="form"><h3>Fair and clear</h3><p class="hint">Dite cosa sta facendo ogni personaggio all’inizio del conflitto. Non è vincolante finché tutti non confermano. '+(me==='gm'?'<b>Come GM, di’ qui apertamente cosa si oppone alla trollbabe e cosa può farle del male</b> (avversari, ambiente, magia, anche ciò che finora era nascosto): ciò che non dici adesso non potrai introdurlo dopo.':'')+'</p>'+
-    '<div class="fairbox"><div class="k">'+esc(whoLabel(othSeat))+(ook?' ✓':'')+'</div><p>'+(oth?nl(oth):'<i class="muted">non ha ancora scritto</i>')+'</p></div>'+
-    fld('fr_text',me==='gm'?'Gli avversari e ciò che può far male':'La tua azione ('+esc(whoLabel(me))+')',{rows:3,def:mine,ph:me==='gm'?'Cosa fanno gli avversari, cosa si oppone, cosa può far male…':''})+
-    '<div class="row">'+btn('Pubblica','fairSay','primary')+(mine&&oth?btn(ok?'Confermato ✓':'Sì, è così','fairOk',ok?'ok':'',ok?'disabled':''):'')+'</div></div>';}
+   const othSeat=me==='gm'?'tb':'gm',mine=c.fair[me],oth=c.fair[othSeat],myTurn=c.fair.turn===me;
+   const box=(s,t,ok)=>'<div class="fairbox"><div class="k">'+esc(whoLabel(s))+(ok?' ✓':'')+'</div><p>'+(t?nl(t):'<i class="muted">non ha ancora scritto</i>')+'</p></div>';
+   return head+'<div class="form"><h3>Fair and clear</h3><p class="hint">A turno: ciascuno dice cosa sta facendo il proprio personaggio all’inizio del conflitto; l’altro accetta o modifica la propria dichiarazione. Si parte quando entrambi accettano. '+(me==='gm'?'<b>Come GM, di’ qui apertamente cosa si oppone alla trollbabe e cosa può farle del male</b> (avversari, ambiente, magia, anche ciò che finora era nascosto): ciò che non dici adesso non potrai introdurlo dopo.':'')+'</p>'+
+    box(othSeat,oth,c.fair[othSeat+'Ok'])+
+    (!myTurn?box(me,mine,c.fair[me+'Ok'])+'<p class="hint">Tocca a '+esc(whoLabel(othSeat))+': legge la tua dichiarazione e accetta o modifica la propria.</p></div>':
+     fld('fr_text',me==='gm'?'Gli avversari e ciò che può far male':'La tua azione ('+esc(whoLabel(me))+')',{rows:3,def:mine,ph:me==='gm'?'Cosa fanno gli avversari, cosa si oppone, cosa può far male…':''})+
+     '<div class="row">'+(!mine?btn('Dichiara','fairSay','primary'):(oth?btn('Accetto così','fairOk','primary'):'')+btn('Modifico e passo la mano','fairSay'))+'</div></div>');}
+  case 'step':{
+   if(me==='gm')return head+'<div class="form"><h3>Serie '+c.series+': la mossa degli avversari</h3><p class="hint">Cosa fanno ora gli avversari, con ciò che hai dichiarato nel Fair and clear. Niente esiti: li decide il dado.</p>'+fld('st_text','La mossa',{rows:2})+'<div class="row">'+btn('Narra la mossa','stepSay','primary')+btn('Nessuna mossa','stepNone')+'</div></div>';
+   return head+(c.step&&c.step.gm?'<div class="fairbox"><div class="k">'+esc(whoLabel('gm'))+'</div><p>'+nl(c.step.gm)+'</p></div>':'')+'<div class="form"><h3>Serie '+c.series+': cosa fai?</h3><p class="hint">Dì cosa fa la trollbabe in questo passo verso il Goal: il tiro decide se le riesce.</p>'+fld('st_text','La tua azione',{rows:2})+btn('Dichiara e tira','stepSay','primary')+'</div>';}
   case 'roll':{
    const rr=ranges(g.pc.number)[c.type];
    return head+'<div class="form rollbox"><div class="die" id="die">d10</div><div><h3>Serie '+c.series+' · '+BOXES[c.box].t+'</h3><p class="hint">'+TYPES[c.type].label+': '+TYPES[c.type].rule+'. Con il tuo numero ('+g.pc.number+') riesci con '+rangeText(rr)+'.'+(c.box>0?' Se fallisci: '+BOXES[c.box].f.toLowerCase()+'.':'')+'</p>'+btn('Tira il d10','roll','primary big')+'</div></div>';}
@@ -461,10 +458,10 @@ function pConflict(){
    const k=c.kind,tt={inconv:'Fallito: scomodata',injury:'Fallito: ferita',alt_incap:'Terzo roll-again riuscito'}[k];
    const hh={inconv:'Il Goal sta cedendo; la scomodità è solo un dettaglio.',injury:'Descrivi la ferita in modo che abbia senso per questo conflitto ('+({fighting:'ferite o sfinimento',magic:'contraccolpo mistico o spiriti ribelli',social:'orgoglio ferito, o una ritorsione fisica se la scena la rende plausibile'}[c.type])+'): resta finché non guarisci.',alt_incap:'Il Goal è perso e sei incapacitata, ma descrivi tu in che circostanze, meno gravi.'}[k];
    const items=availableItems(g);
-   return head+rollNote(c)+'<div class="form"><h3>'+tt+'</h3><p class="hint">'+hh+'</p>'+fld('nt_text','Narra',{rows:3})+
+   return head+rollNote(c)+'<div class="form"><h3>'+tt+'</h3><p class="hint">'+hh+'</p>'+fld('nt_text',k==='alt_incap'?'Narra':'Narra il fallimento',{rows:3})+
     (k==='alt_incap'?btn('Narra','narrTB','primary','data-primary="1"'):
      '<div class="row">'+btn(lastSeries(c,'fail')?'Accetta l’esito: il Goal fallisce':'Accetta l’esito e vai alla Serie successiva','narrStop')+'</div>'+
-     (items.length?'<div class="fld"><label>Oppure rilancia con un roll-again</label>'+itemSeg('nt_item',items)+'</div>'+btn('Rilancia','narrCont','primary'):'<p class="hint">Non hai più roll-again disponibili.</p>'))+'</div>';}
+     (items.length?'<div class="fld"><label>Oppure rilancia con un roll-again</label>'+itemSeg('nt_item',items)+'</div>'+fld('nt_how','Come ti aiuta',{rows:2,ph:'Come l’alleato, l’oggetto, l’incantesimo o il terreno ti rimette in gioco'})+btn('Rilancia','narrCont','primary'):'<p class="hint">Non hai più roll-again disponibili.</p>'))+'</div>';}
   case 'decide_tb':{
    const items=availableItems(g);
    if(c.kind==='incap')return head+rollNote(c)+'<div class="form"><h3>Sei incapacitata</h3><p class="hint">Accetta la narrazione del GM, oppure gioca l’ultimo roll-again per attenuarla.</p><div class="row">'+btn('Accetto','decideStop')+'</div>'+
@@ -602,12 +599,14 @@ const ACT={
  async requestGM(){await A.request('',D.sr_heal==='yes');clear('sr_text','sr_heal');},
  async setGoal(){if(!v('cg_goal'))throw 'Dichiara il tuo Goal.';await A.setGoal(v('cg_goal'),D.cg_adj||'keep');clear('cg_goal','cg_adj');},
  async paceAdj(){await A.paceAdj(D.cp_adj||'keep');clear('cp_adj');},
- async fairSay(){const t=v('fr_text');if(!t)throw 'Scrivi cosa fa il tuo personaggio.';await A.fairSay(ROLE,t);},
+ async fairSay(){const t=v('fr_text');if(!t)throw 'Scrivi cosa fa il tuo personaggio.';if(G.conflict&&t===G.conflict.fair[ROLE])throw 'Non hai cambiato nulla: se ti va bene così, accetta.';await A.fairSay(ROLE,t);},
+ async stepSay(){const t=v('st_text');if(!t)throw ROLE==='gm'?'Scrivi la mossa, oppure scegli «Nessuna mossa».':'Dì cosa fa la trollbabe.';await A.stepSay(ROLE,t);clear('st_text');},
+ async stepNone(){await A.stepSay('gm','');clear('st_text');},
  async fairOk(){await A.fairOk(ROLE);},
  async roll(){const val=d10();await animateDie(val);await A.roll(val);},
  async narrGM(){const t=v('ng_text');if(!t)throw 'Scrivi la narrazione.';await A.narrGM(t);clear('ng_text');},
  async narrStop(){const t=v('nt_text');if(!t)throw 'Narra il fallimento.';await A.narrTB(t,null);clear('nt_text');},
- async narrCont(){const t=v('nt_text');if(!t)throw 'Narra il fallimento e come usi il roll-again.';await A.narrTB(t,{item:D.nt_item});clear('nt_text','nt_item');},
+ async narrCont(){const t=v('nt_text'),h=v('nt_how');if(!t)throw 'Narra il fallimento.';if(!h)throw 'Dì come ti aiuta il roll-again.';await A.narrTB(t,{item:D.nt_item,how:h});clear('nt_text','nt_item','nt_how');},
  async narrTB(){const t=v('nt_text');if(!t)throw 'Narra.';await A.narrTB(t,null);clear('nt_text');},
  async decideStop(){await A.decide({});clear('dc_text','dc_item');},
  async decideItem(){const t=v('dc_text');if(!t)throw 'Descrivi il roll-again.';await A.decide({item:D.dc_item,text:t});clear('dc_text','dc_item');},
