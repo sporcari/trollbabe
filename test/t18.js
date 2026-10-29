@@ -6,7 +6,7 @@ const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if
 (async()=>{
   let mode='agree';
   const ai={
-   gm_prep:()=>({where:'w',who:'h',stakes:'x',a:'a',b:'b',characters:[{name:'Ingrid',want:'x'}],notes:''}),
+   gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'w',who:'h',stakes:'x',a:'a',b:'b',characters:[{name:'Ingrid',want:'x'}],notes:''}),
    scene_open:()=>({text:'Il molo.',npcs:['Ingrid'],heal:false}),
    gm_respond:()=>({text:'Ingrid aspetta.'}),
    narr_gm:()=>({text:'Ingrid cede.'}),

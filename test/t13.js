@@ -1,7 +1,7 @@
 const {makeStore,makeClient,sleep}=require('./harness');
 const assert=require('assert');
 (async()=>{
-  const ai={gm_prep:()=>({where:'w',who:'h',stakes:'S',a:'a',b:'b',characters:[],notes:''}),scene_open:()=>({text:'Eirik è davanti a te.',npcs:['Eirik'],heal:false}),
+  const ai={gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'w',who:'h',stakes:'S',a:'a',b:'b',characters:[],notes:''}),scene_open:()=>({text:'Eirik è davanti a te.',npcs:['Eirik'],heal:false}),
     gm_respond:()=>({text:'Eirik spalanca gli occhi mentre la scure lascia la tua mano.',conflict:{type:'fighting',pace:1},end_scene:false})};
   const w=makeClient(makeStore(),'uA',{ai});await sleep(120);const T=w.__TB;
   T.D.n_name='S';T.D.n_role='tb';T.D.n_other='ai';await T.ACT.newGame();await sleep(150);

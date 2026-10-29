@@ -5,7 +5,7 @@ const eq=(a,b,m)=>assert.strictEqual(a,b,m+' (atteso '+b+', trovato '+a+')');
 const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if(f())return;await sleep(20);}throw new Error('timeout: '+m);};
 (async()=>{
   const ai={
-   gm_prep:()=>({where:'w',who:'h',stakes:'Le ossa',a:'sepolte',b:'perdute',characters:[{name:'Ingrid',want:'x'}],notes:''}),
+   gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'w',who:'h',stakes:'Le ossa',a:'sepolte',b:'perdute',characters:[{name:'Ingrid',want:'x'}],notes:''}),
    scene_open:()=>({text:'Nebbia sul molo. Ingrid ti guarda.',npcs:['Ingrid'],heal:false}),
    gm_respond:n=>n===1?{text:'',ask:'Lo chiedi a Ingrid o a me come GM?'}:n===2?{text:'Ingrid ha vent’anni.',ask:'Ancora una domanda'}:n===3?{text:'',ask:'Cosa intendi?'}:{text:'Ingrid annuisce.'},
    table_talk:()=>({text:'Hai ragione: sei troppo lontana, la frase della cieca non l’hai sentita.'})

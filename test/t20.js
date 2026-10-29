@@ -7,7 +7,7 @@ const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if
   let T=null;
   const scene=()=>T.LOG.find(e=>e.type==='scene'),mine=()=>T.LOG.find(e=>e.type==='tb');
   const ai={
-   gm_prep:()=>({where:'w',who:'h',stakes:'Ingrid',a:'vive',b:'muore',characters:[{name:'Hrafn',want:'il clan'}],notes:'Hrafn avvelenò l’offerta.'}),
+   gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'w',who:'h',stakes:'Ingrid',a:'vive',b:'muore',characters:[{name:'Hrafn',want:'il clan'}],notes:'Hrafn avvelenò l’offerta.'}),
    scene_open:()=>({text:'Il relitto di Torvald affondò vent’anni fa. Ingrid ti guarda.',npcs:['Ingrid'],heal:false}),
    gm_respond:()=>({text:'Ingrid annuisce.'}),
    table_talk:n=>n===1?{text:'Hai ragione: correggo, Torvald è morto quattro anni fa.',amend:{of:scene().n,text:'Il relitto di Torvald affondò quattro anni fa. Ingrid ti guarda.'}}

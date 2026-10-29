@@ -1,5 +1,5 @@
 const ai={
-  gm_prep:()=>({where:'Un porto fumoso',who:'Umani e troll',stakes:'Oskel',a:'vive',b:'muore',characters:[{name:'Orm',want:'onore'}],notes:'segreto-chiave'}),
+  gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'Un porto fumoso',who:'Umani e troll',stakes:'Oskel',a:'vive',b:'muore',characters:[{name:'Orm',want:'onore'}],notes:'segreto-chiave'}),
   scene_open:()=>({text:'Nebbia sul molo.',npcs:['Orm'],heal:false}),
   gm_respond:(n)=>n===1?{text:'Hrenk ti squadra.',npcs:['Hrenk']}:n===2?{text:'Sputa.',conflict:{type:'social',pace:2}}:n===3?{text:'Fine.',end_scene:true}:n===4?{text:'Altra nebbia.'}:{text:'Il molo brucia.',end_adventure:true},
   fair_gm:()=>({text:'Hrenk avanza.'}),step_gm:()=>({text:'Hrenk ritenta.'}),review:()=>({objection:null}),narr_gm:()=>({text:'Un colpo netto.'}),ending:()=>({outcome:'b',text:'Il porto cade.'}),

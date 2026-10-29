@@ -5,7 +5,7 @@ const eq=(a,b,m)=>assert.strictEqual(a,b,m+' (atteso '+b+', trovato '+a+')');
 const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if(f())return;await sleep(20);}throw new Error('timeout: '+m);};
 (async()=>{
   const ai={
-   gm_prep:()=>({where:'w',who:'h',stakes:'Il troll',a:'vive',b:'muore',characters:[{name:'Harald',want:'x'}],notes:''}),
+   gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'w',who:'h',stakes:'Il troll',a:'vive',b:'muore',characters:[{name:'Harald',want:'x'}],notes:''}),
    scene_open:()=>({text:'Riva del fiume. Harald affila l’ascia.',npcs:['Harald'],heal:false}),
    gm_respond:n=>n===1?{text:'',objection:'Hrenk non è mai stato nominato: è un personaggio nuovo (niente informazioni nuove).'}
                  :n===3?{text:'',objection:'Ylva non esiste ancora nella storia.'}:{text:'Harald ti osserva.'},

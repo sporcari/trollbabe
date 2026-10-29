@@ -3,7 +3,7 @@ const assert=require('assert');
 (async()=>{
   const store=makeStore();
   let n=0;
-  const w=makeClient(store,'uGM',{ai:{gm_prep:()=>({where:'Un fiordo',who:'Pescatori e un troll',stakes:'La barca di Unn',a:'Si salva',b:'Affonda',characters:[{name:'Unn',want:'partire'},{name:'Gunnar',want:'trattenerla'}],notes:'n'+(++n)})}});
+  const w=makeClient(store,'uGM',{ai:{gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'Un fiordo',who:'Pescatori e un troll',stakes:'La barca di Unn',a:'Si salva',b:'Affonda',characters:[{name:'Unn',want:'partire'},{name:'Gunnar',want:'trattenerla'}],notes:'n'+(++n)})}});
   const w2=makeClient(store,'uTB',{noSample:true});
   await sleep(120);const T=w.__TB;
   T.D.n_name='M';T.D.n_role='gm';T.D.n_other='human';await T.ACT.newGame();await sleep(40);

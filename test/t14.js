@@ -5,7 +5,7 @@ const waitFor=async(c,ms)=>{const t0=Date.now();while(Date.now()-t0<(ms||6000)){
 const rollWait=async T=>{const t=Date.now()+3000;while((T.G.review||T.G.objection)&&Date.now()<t)await sleep(20);};
 (async()=>{
   const store=makeStore();
-  const ai={gm_prep:()=>({where:'w',who:'h',stakes:'S',a:'a',b:'b',characters:[],notes:''}),scene_open:()=>({text:'Scena.',npcs:[],heal:true}),gm_respond:()=>({text:'ok'}),fair_gm:()=>({text:'Il canto sale.'}),narr_gm:()=>({text:'ok'}),review:()=>({objection:null})};
+  const ai={gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'w',who:'h',stakes:'S',a:'a',b:'b',characters:[],notes:''}),scene_open:()=>({text:'Scena.',npcs:[],heal:true}),gm_respond:()=>({text:'ok'}),fair_gm:()=>({text:'Il canto sale.'}),narr_gm:()=>({text:'ok'}),review:()=>({objection:null})};
   const w=makeClient(store,'uA',{ai});await sleep(120);const T=w.__TB;const roll=async v=>{await rollWait(T);return T.A.roll(v);};
   T.D.n_name='S';T.D.n_role='tb';T.D.n_other='ai';await T.ACT.newGame();await sleep(150);
   Object.assign(T.D,{pc_name:'Gwenna',pc_num:'6',pc_magic:'troll',pc_fight:'missile',pc_social:'fun'});await T.ACT.createPC();await T.ACT.tvPlace({dataset:{val:'p3'}});await T.ACT.travel();await sleep(1500);

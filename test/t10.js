@@ -2,7 +2,7 @@ const {makeStore,makeClient,sleep}=require('./harness');
 const {tbBot,runUntil}=require('./bots');
 const assert=require('assert');
 (async()=>{
-  const ai={gm_prep:()=>({where:'w',who:'h',stakes:'Oskel',a:'vive',b:'muore',characters:[{name:'Orm',want:'x'}],notes:''}),
+  const ai={gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'w',who:'h',stakes:'Oskel',a:'vive',b:'muore',characters:[{name:'Orm',want:'x'}],notes:''}),
    scene_open:()=>({text:'t',npcs:[],heal:false}),gm_respond:(n)=>n<2?{text:'x'}:{text:'fine',end_adventure:true},ending:()=>({outcome:'a',text:'e'}),fair_gm:()=>({text:'f'}),narr_gm:()=>({text:'n'})};
   const w=makeClient(makeStore(),'uA',{ai});await sleep(120);const T=w.__TB;
   T.D.n_name='S';T.D.n_role='tb';T.D.n_other='ai';await T.ACT.newGame();

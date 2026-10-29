@@ -3,7 +3,7 @@ const {tbBot,runUntil}=require('./bots');
 const assert=require('assert');
 
 const ai={
-  gm_prep:()=>({where:'Un porto fumoso',who:'Umani e troll',stakes:'Oskel, figlio del capo',a:'Oskel vive',b:'Oskel muore',characters:[{name:'Orm',want:'onore'},{name:'Ennda',want:'pace'}],notes:'segreto'}),
+  gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'Un porto fumoso',who:'Umani e troll',stakes:'Oskel, figlio del capo',a:'Oskel vive',b:'Oskel muore',characters:[{name:'Orm',want:'onore'},{name:'Ennda',want:'pace'}],notes:'segreto'}),
   scene_open:(n)=>({text:'Scena aperta '+n+': nebbia.',npcs:['Orm'],heal:true}),
   gm_respond:(n)=> n===1?{text:'Hrenk ti squadra.',npcs:['Hrenk'],conflict:null,end_scene:false}
                  : n===2?{text:'Hrenk ti sputa ai piedi.',conflict:{type:'social',pace:2},end_scene:false}

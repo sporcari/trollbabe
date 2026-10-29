@@ -6,7 +6,7 @@ const until=async(f,ms,m)=>{const t=Date.now()+(ms||3000);while(Date.now()<t){if
 const rollWait=async T=>{const t=Date.now()+3000;while((T.G.review||T.G.objection)&&Date.now()<t)await sleep(20);};
 (async()=>{
   const ai={
-   gm_prep:()=>({where:'w',who:'h',stakes:'Oskel',a:'vive',b:'muore',characters:[{name:'Harald',want:'x'}],notes:''}),
+   gm_prep:()=>({who_bears:{a:'x',b:'y',scale:1},where:'w',who:'h',stakes:'Oskel',a:'vive',b:'muore',characters:[{name:'Harald',want:'x'}],notes:''}),
    scene_open:()=>({text:'Riva del fiume. Harald alza l’ascia.',npcs:['Harald'],heal:false}),
    gm_respond:()=>({text:'Harald aspetta.'}),
    fair_gm:()=>({text:'Harald carica con l’ascia del padre.'}),
